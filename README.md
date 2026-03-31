@@ -12,6 +12,7 @@ LeadLock is a mobile-first web platform for local service businesses with two co
 - Tailwind CSS
 - React Hook Form + Zod
 - Recharts
+- SQLite via Node's built-in `node:sqlite`
 
 ## MVP Notes
 
@@ -29,6 +30,7 @@ LeadLock is a mobile-first web platform for local service businesses with two co
 Once Node.js is installed:
 
 ```bash
+cp .env.example .env.local
 npm install
 npm run dev
 ```
@@ -56,3 +58,87 @@ src/
   lib/
   types/
 ```
+
+## Persistence
+
+Lead and appointment records now persist to a local SQLite database.
+
+- Default database path: `./data/leadlock.sqlite`
+- Override with `DATABASE_PATH` in `.env.local`
+
+Current schema:
+
+- `leads`
+  - `id`
+  - `name`
+  - `business`
+  - `email`
+  - `phone`
+  - `service`
+  - `source`
+  - `status`
+  - `location`
+  - `requested_at`
+  - `value`
+
+- `appointments`
+  - `id`
+  - `customer_name`
+  - `service`
+  - `scheduled_for`
+  - `status`
+  - `assigned_to`
+  - `notes`
+
+- `calls`
+  - `id`
+  - `caller_name`
+  - `caller_number`
+  - `timestamp`
+  - `summary`
+  - `transcript_preview`
+  - `call_status`
+  - `outcome`
+  - `duration_minutes`
+
+- `outbound_messages`
+  - `id`
+  - `appointment_id`
+  - `lead_name`
+  - `channel`
+  - `message_type`
+  - `outcome`
+  - `status`
+  - `created_at`
+
+## Webhook Ingestion
+
+LeadLock now supports a secure webhook endpoint for AI receptionist call ingestion:
+
+- Endpoint: `POST /api/webhooks/calls`
+- Secret env var: `CALL_WEBHOOK_SECRET`
+- Header support:
+  - `x-leadlock-webhook-secret`
+  - `x-webhook-secret`
+  - `Authorization: Bearer <secret>`
+
+Accepted payload fields:
+
+- `id`
+- `callerName` or `caller_name`
+- `callerNumber` or `caller_number`
+- `timestamp`
+- `summary`
+- `transcriptPreview` or `transcript_preview`
+- `callStatus` or `call_status`
+- `outcome`
+- `durationMinutes` or `duration_minutes`
+
+## Booking Confirmation Messaging
+
+When a booking is created, LeadLock now triggers a provider-agnostic confirmation workflow.
+
+- Current provider mode: `mock`
+- Env var: `MESSAGING_PROVIDER`
+- Message records persist to `outbound_messages`
+- Dashboard follow-ups read from saved outbound message records rather than mock-only data

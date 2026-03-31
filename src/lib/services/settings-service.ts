@@ -1,5 +1,5 @@
 import { businessSettings } from "@/lib/mock-data/settings";
-import { followUps } from "@/lib/mock-data/follow-ups";
+import { messagingService } from "@/lib/services/messaging-service";
 import type { BusinessSettings, FollowUpEvent } from "@/types/domain";
 
 export interface SettingsService {
@@ -12,7 +12,6 @@ export const settingsService: SettingsService = {
     return Promise.resolve(businessSettings);
   },
   async getFollowUps() {
-    return Promise.resolve(followUps);
+    return messagingService.getFollowUps();
   }
 };
-

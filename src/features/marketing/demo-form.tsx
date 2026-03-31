@@ -13,14 +13,27 @@ export function DemoForm() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting }
   } = useForm<DemoFormValues>({
     resolver: zodResolver(demoFormSchema)
   });
 
-  const onSubmit = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
+  const onSubmit = async (values: DemoFormValues) => {
+    const response = await fetch("/api/leads", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(values)
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to save lead.");
+    }
+
     setSubmitted(true);
+    reset();
   };
 
   return (
@@ -53,9 +66,10 @@ export function DemoForm() {
         {isSubmitting ? "Submitting..." : "Request My Demo"}
       </Button>
       {submitted ? (
-        <p className="text-sm text-emerald-700">Demo request captured. In MVP this stays mocked and local.</p>
+        <p className="text-sm text-emerald-700">
+          Demo request saved. You can now see it in the dashboard leads view.
+        </p>
       ) : null}
     </form>
   );
 }
-

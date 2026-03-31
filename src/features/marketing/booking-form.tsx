@@ -14,14 +14,27 @@ export function BookingForm() {
   const {
     register,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting }
   } = useForm<BookingFormValues>({
     resolver: zodResolver(bookingFormSchema)
   });
 
-  const onSubmit = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 300));
+  const onSubmit = async (values: BookingFormValues) => {
+    const response = await fetch("/api/appointments", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(values)
+    });
+
+    if (!response.ok) {
+      throw new Error("Unable to save appointment.");
+    }
+
     setSubmitted(true);
+    reset();
   };
 
   return (
@@ -48,14 +61,13 @@ export function BookingForm() {
         <Textarea placeholder="Tell us what you need help with..." {...register("notes")} />
       </div>
       <Button disabled={isSubmitting} size="lg" type="submit">
-        {isSubmitting ? "Booking..." : "Confirm Mock Booking"}
+        {isSubmitting ? "Booking..." : "Confirm Booking"}
       </Button>
       {submitted ? (
         <p className="text-sm text-emerald-700">
-          Booking confirmed in the MVP flow. Calendar sync stays stubbed until backend integration.
+          Booking saved in LeadLock. Dashboard appointments will now reflect the new record.
         </p>
       ) : null}
     </form>
   );
 }
-

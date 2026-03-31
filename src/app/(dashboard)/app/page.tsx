@@ -7,33 +7,34 @@ import { CallLogTable } from "@/components/dashboard/call-log-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { analyticsService } from "@/lib/services/analytics-service";
 import { appointmentService } from "@/lib/services/appointment-service";
+import { leadService } from "@/lib/services/lead-service";
 import { receptionistService } from "@/lib/services/receptionist-service";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function AppOverviewPage() {
-  const [analytics, appointments, calls] = await Promise.all([
-    analyticsService.getSnapshot(),
+  const [leads, appointments, calls] = await Promise.all([
+    leadService.getLeads(),
     appointmentService.getAppointments(),
     receptionistService.getCalls()
   ]);
   const answeredCalls = calls.filter((call) => call.outcome === "answered").length;
+  const bookedAppointments = appointments.filter((appointment) => appointment.status !== "completed").length;
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Overview"
         title="Dashboard overview"
-        description="A quick snapshot of lead volume, bookings, and receptionist activity."
+        description="A quick snapshot of lead volume, bookings, and persisted call activity."
         action={<Button>Export Snapshot</Button>}
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           eyebrow="Pipeline"
           label="Total leads"
-          value={String(analytics.totalLeads)}
-          change="+18% this week"
+          value={String(leads.length)}
+          change={`${leads.filter((lead) => lead.status === "new").length} new this week`}
           icon={<Users className="h-4 w-4" />}
         />
         <StatCard
@@ -47,15 +48,15 @@ export default async function AppOverviewPage() {
         <StatCard
           eyebrow="Scheduling"
           label="Booked appointments"
-          value={String(analytics.bookedAppointments)}
-          change="+9 this week"
+          value={String(bookedAppointments)}
+          change={`${appointments.filter((appointment) => appointment.status === "pending").length} pending review`}
           icon={<CalendarDays className="h-4 w-4" />}
         />
         <StatCard
           eyebrow="Conversion"
-          label="Conversion rate"
-          value={`${analytics.conversionRate}%`}
-          change="+4 points"
+          label="Lead-to-booking ratio"
+          value={`${leads.length === 0 ? 0 : Math.round((appointments.length / leads.length) * 100)}%`}
+          change="Computed from saved data"
           tone="success"
           icon={<TrendingUp className="h-4 w-4" />}
         />
@@ -108,7 +109,7 @@ export default async function AppOverviewPage() {
         </DataTableCard>
         <DataTableCard
           title="Latest calls"
-          description="A quick look at recent calls, outcomes, and transcript previews."
+          description="A quick look at recent calls, statuses, outcomes, and transcript previews."
           action={<Badge>{calls.length} total</Badge>}
         >
           <CallLogTable calls={calls} />

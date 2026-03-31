@@ -24,6 +24,7 @@ export default async function FollowUpsPage() {
               </div>
               <div className="flex items-center gap-3">
                 <Badge>{event.channel}</Badge>
+                <Badge>{event.status}</Badge>
                 <p className="text-xs text-muted-foreground">{formatDateTime(event.timestamp)}</p>
               </div>
             </div>

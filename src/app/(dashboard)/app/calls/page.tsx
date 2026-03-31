@@ -17,7 +17,7 @@ export default async function CallsPage() {
       <PageHeader
         eyebrow="Communications"
         title="Calls"
-        description="Call logs, outcomes, and transcript previews stay mock-backed for the MVP."
+        description="Persisted call logs, transcript previews, statuses, and outcomes from the webhook ingestion path."
       />
       <div className="grid gap-4 sm:grid-cols-3">
         <Card className="rounded-3xl p-5">
@@ -33,9 +33,9 @@ export default async function CallsPage() {
           </p>
         </Card>
         <Card className="rounded-3xl p-5">
-          <p className="text-sm text-muted-foreground">Voicemails</p>
+          <p className="text-sm text-muted-foreground">Voicemails / unknown</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {calls.filter((call) => call.outcome === "voicemail").length}
+            {calls.filter((call) => call.outcome === "voicemail" || call.outcome === "unknown").length}
           </p>
         </Card>
       </div>
@@ -65,4 +65,3 @@ export default async function CallsPage() {
     </div>
   );
 }
-

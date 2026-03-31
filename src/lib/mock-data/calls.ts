@@ -4,6 +4,8 @@ export const callLogs: CallLog[] = [
   {
     id: "call-001",
     callerName: "Angela Ruiz",
+    callerNumber: "(626) 555-0120",
+    callStatus: "completed",
     outcome: "missed",
     summary: "Customer asked about emergency availability for a burst pipe.",
     transcriptPreview: "Hi, I need someone out today if possible. We have a pipe burst under the kitchen sink and water is spreading fast.",
@@ -13,6 +15,8 @@ export const callLogs: CallLog[] = [
   {
     id: "call-002",
     callerName: "Trevor Kim",
+    callerNumber: "(818) 555-0199",
+    callStatus: "completed",
     outcome: "answered",
     summary: "Booked same-day estimate after receptionist shared pricing range.",
     transcriptPreview: "I wanted to know your estimate range for HVAC repair. If someone can come today, go ahead and put me on the schedule.",
@@ -22,6 +26,8 @@ export const callLogs: CallLog[] = [
   {
     id: "call-003",
     callerName: "Unknown Caller",
+    callerNumber: "(310) 555-0147",
+    callStatus: "completed",
     outcome: "voicemail",
     summary: "Requested a callback for weekend availability.",
     transcriptPreview: "Calling to ask if you have any openings this weekend. Please call me back when you can.",

@@ -57,7 +57,7 @@ export default async function LeadsPage() {
                 <td className="px-5 py-4">
                   <div>
                     <p className="font-medium text-slate-950">{lead.name}</p>
-                    <p className="text-xs text-muted-foreground">{lead.location}</p>
+                    <p className="text-xs text-muted-foreground">{lead.business ?? lead.location}</p>
                   </div>
                 </td>
                 <td className="px-5 py-4 text-muted-foreground">{lead.service}</td>
@@ -83,7 +83,7 @@ export default async function LeadsPage() {
               </div>
               <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
                 <span>{lead.source}</span>
-                <span>{lead.location}</span>
+                <span>{lead.business ?? lead.location}</span>
                 <span>{formatDateTime(lead.requestedAt)}</span>
                 <span>{formatCurrency(lead.value)}</span>
               </div>
