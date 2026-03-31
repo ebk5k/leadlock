@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "LeadLock: Bootstrap",
+      "type": "shell",
+      "command": "./scripts/codex/bootstrap.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "LeadLock: Dev",
+      "type": "shell",
+      "command": "./scripts/codex/dev.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "LeadLock: Lint",
+      "type": "shell",
+      "command": "./scripts/codex/lint.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "LeadLock: Build",
+      "type": "shell",
+      "command": "./scripts/codex/build.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+
