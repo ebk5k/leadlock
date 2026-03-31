@@ -1,5 +1,6 @@
 import { ArrowRight, CalendarDays, PhoneCall, TrendingUp, Users } from "lucide-react";
 
+import { CalendarSyncBadge } from "@/components/dashboard/calendar-sync-badge";
 import { DataTableCard } from "@/components/dashboard/data-table-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -20,6 +21,9 @@ export default async function AppOverviewPage() {
   ]);
   const answeredCalls = calls.filter((call) => call.outcome === "answered").length;
   const bookedAppointments = appointments.filter((appointment) => appointment.status !== "completed").length;
+  const syncedAppointments = appointments.filter(
+    (appointment) => appointment.calendarSyncStatus === "synced"
+  ).length;
 
   return (
     <div className="space-y-6">
@@ -49,7 +53,7 @@ export default async function AppOverviewPage() {
           eyebrow="Scheduling"
           label="Booked appointments"
           value={String(bookedAppointments)}
-          change={`${appointments.filter((appointment) => appointment.status === "pending").length} pending review`}
+          change={`${syncedAppointments} synced to calendar`}
           icon={<CalendarDays className="h-4 w-4" />}
         />
         <StatCard
@@ -64,7 +68,7 @@ export default async function AppOverviewPage() {
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <DataTableCard
           title="Upcoming appointments"
-          description="Mock appointments are async-backed now so a real API can slide in later."
+          description="Appointments now save sync state alongside the booking record."
           action={<Badge>Next 3 jobs</Badge>}
         >
           <table className="hidden min-w-full text-sm md:table">
@@ -74,6 +78,7 @@ export default async function AppOverviewPage() {
                 <th className="px-5 py-3">Service</th>
                 <th className="px-5 py-3">Time</th>
                 <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Calendar</th>
               </tr>
             </thead>
             <tbody>
@@ -84,6 +89,9 @@ export default async function AppOverviewPage() {
                   <td className="px-5 py-4 text-muted-foreground">{formatDateTime(appointment.scheduledFor)}</td>
                   <td className="px-5 py-4">
                     <Badge>{appointment.status}</Badge>
+                  </td>
+                  <td className="px-5 py-4">
+                    <CalendarSyncBadge status={appointment.calendarSyncStatus} />
                   </td>
                 </tr>
               ))}
@@ -97,7 +105,10 @@ export default async function AppOverviewPage() {
                     <p className="font-medium text-slate-950">{appointment.customerName}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{appointment.service}</p>
                   </div>
-                  <Badge>{appointment.status}</Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge>{appointment.status}</Badge>
+                    <CalendarSyncBadge status={appointment.calendarSyncStatus} />
+                  </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                   <span>{formatDateTime(appointment.scheduledFor)}</span>

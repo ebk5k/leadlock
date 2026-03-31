@@ -1,4 +1,5 @@
 export type LeadStatus = "new" | "contacted" | "qualified" | "booked" | "won";
+export type CalendarSyncStatus = "pending" | "synced" | "failed";
 
 export interface Lead {
   id: string;
@@ -22,6 +23,10 @@ export interface Appointment {
   status: "confirmed" | "pending" | "completed";
   assignedTo: string;
   notes?: string;
+  externalCalendarEventId?: string;
+  calendarProvider?: string;
+  calendarSyncError?: string;
+  calendarSyncStatus: CalendarSyncStatus;
 }
 
 export interface CallLog {

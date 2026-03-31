@@ -7,7 +7,10 @@ export const appointments: Appointment[] = [
     service: "Deep Cleaning",
     scheduledFor: "2026-04-01T18:00:00.000Z",
     status: "confirmed",
-    assignedTo: "Mike"
+    assignedTo: "Mike",
+    calendarProvider: "mock",
+    calendarSyncStatus: "synced",
+    externalCalendarEventId: "mock-cal-001"
   },
   {
     id: "appt-002",
@@ -15,7 +18,8 @@ export const appointments: Appointment[] = [
     service: "HVAC Repair",
     scheduledFor: "2026-04-01T20:30:00.000Z",
     status: "pending",
-    assignedTo: "Sarah"
+    assignedTo: "Sarah",
+    calendarSyncStatus: "pending"
   },
   {
     id: "appt-003",
@@ -23,7 +27,9 @@ export const appointments: Appointment[] = [
     service: "Drain Inspection",
     scheduledFor: "2026-04-02T16:00:00.000Z",
     status: "confirmed",
-    assignedTo: "Field Team"
+    assignedTo: "Field Team",
+    calendarProvider: "mock",
+    calendarSyncStatus: "synced",
+    externalCalendarEventId: "mock-cal-003"
   }
 ];
-

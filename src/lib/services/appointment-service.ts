@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
 import { getDatabase } from "@/lib/data/database";
+import { calendarService } from "@/lib/services/calendar-service";
 import { messagingService } from "@/lib/services/messaging-service";
 import type { Appointment } from "@/types/domain";
 
@@ -21,7 +22,18 @@ export const appointmentService: AppointmentService = {
     const rows = getDatabase()
       .prepare(
         `
-          SELECT id, customer_name, service, scheduled_for, status, assigned_to, notes
+          SELECT
+            id,
+            customer_name,
+            service,
+            scheduled_for,
+            status,
+            assigned_to,
+            notes,
+            external_calendar_event_id,
+            calendar_sync_status,
+            calendar_provider,
+            calendar_sync_error
           FROM appointments
           ORDER BY datetime(scheduled_for) ASC
         `
@@ -35,7 +47,13 @@ export const appointmentService: AppointmentService = {
       scheduledFor: String(row.scheduled_for),
       status: row.status as Appointment["status"],
       assignedTo: String(row.assigned_to),
-      notes: row.notes ? String(row.notes) : undefined
+      notes: row.notes ? String(row.notes) : undefined,
+      externalCalendarEventId: row.external_calendar_event_id
+        ? String(row.external_calendar_event_id)
+        : undefined,
+      calendarProvider: row.calendar_provider ? String(row.calendar_provider) : undefined,
+      calendarSyncError: row.calendar_sync_error ? String(row.calendar_sync_error) : undefined,
+      calendarSyncStatus: (row.calendar_sync_status as Appointment["calendarSyncStatus"]) ?? "pending"
     }));
   },
   async createAppointment(input) {
@@ -46,15 +64,16 @@ export const appointmentService: AppointmentService = {
       scheduledFor: input.scheduledFor,
       status: "pending",
       assignedTo: "Dispatch Review",
-      notes: input.notes
+      notes: input.notes,
+      calendarSyncStatus: "pending"
     };
 
     getDatabase()
       .prepare(
         `
           INSERT INTO appointments (
-            id, customer_name, service, scheduled_for, status, assigned_to, notes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            id, customer_name, service, scheduled_for, status, assigned_to, notes, external_calendar_event_id, calendar_sync_status, calendar_provider, calendar_sync_error
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
@@ -64,11 +83,16 @@ export const appointmentService: AppointmentService = {
         appointment.scheduledFor,
         appointment.status,
         appointment.assignedTo,
-        appointment.notes ?? null
+        appointment.notes ?? null,
+        appointment.externalCalendarEventId ?? null,
+        appointment.calendarSyncStatus,
+        appointment.calendarProvider ?? null,
+        appointment.calendarSyncError ?? null
       );
 
-    await messagingService.triggerBookingConfirmation({ appointment });
+    const syncedAppointment = await calendarService.syncAppointmentCreated(appointment);
+    await messagingService.triggerBookingConfirmation({ appointment: syncedAppointment });
 
-    return appointment;
+    return syncedAppointment;
   }
 };

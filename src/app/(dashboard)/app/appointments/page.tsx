@@ -1,3 +1,4 @@
+import { CalendarSyncBadge } from "@/components/dashboard/calendar-sync-badge";
 import { DataTableCard } from "@/components/dashboard/data-table-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -13,12 +14,12 @@ export default async function AppointmentsPage() {
       <PageHeader
         eyebrow="Scheduling"
         title="Appointments"
-        description="A simple appointment queue designed for later calendar sync and operational workflows."
+        description="A simple appointment queue with persisted calendar sync status for each booking."
       />
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <DataTableCard
           title="Scheduled work"
-          description="MVP uses mock bookings first and leaves calendar providers stubbed."
+          description="Bookings save into LeadLock first, then sync through the configured calendar provider."
           action={<Badge>{appointments.length} upcoming</Badge>}
         >
           <table className="hidden min-w-full text-sm md:table">
@@ -29,6 +30,7 @@ export default async function AppointmentsPage() {
                 <th className="px-5 py-3">When</th>
                 <th className="px-5 py-3">Assigned</th>
                 <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Calendar</th>
               </tr>
             </thead>
             <tbody>
@@ -40,6 +42,16 @@ export default async function AppointmentsPage() {
                   <td className="px-5 py-4 text-muted-foreground">{appointment.assignedTo}</td>
                   <td className="px-5 py-4">
                     <Badge>{appointment.status}</Badge>
+                  </td>
+                  <td className="px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CalendarSyncBadge status={appointment.calendarSyncStatus} />
+                      {appointment.externalCalendarEventId ? (
+                        <span className="text-xs text-muted-foreground">
+                          {appointment.externalCalendarEventId}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -53,11 +65,15 @@ export default async function AppointmentsPage() {
                     <p className="font-medium text-slate-950">{appointment.customerName}</p>
                     <p className="mt-1 text-sm text-muted-foreground">{appointment.service}</p>
                   </div>
-                  <Badge>{appointment.status}</Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge>{appointment.status}</Badge>
+                    <CalendarSyncBadge status={appointment.calendarSyncStatus} />
+                  </div>
                 </div>
                 <div className="mt-3 space-y-1 text-xs text-muted-foreground">
                   <p>{formatDateTime(appointment.scheduledFor)}</p>
                   <p>Assigned to {appointment.assignedTo}</p>
+                  {appointment.calendarSyncError ? <p>{appointment.calendarSyncError}</p> : null}
                 </div>
               </Card>
             ))}

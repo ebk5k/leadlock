@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { bookingFormSchema, type BookingFormValues } from "@/lib/validators/forms";
 
 export function BookingForm() {
-  const [submitted, setSubmitted] = useState(false);
+  const [resultMessage, setResultMessage] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -33,7 +33,17 @@ export function BookingForm() {
       throw new Error("Unable to save appointment.");
     }
 
-    setSubmitted(true);
+    const payload = (await response.json()) as {
+      appointment: {
+        calendarSyncStatus: "pending" | "synced" | "failed";
+      };
+    };
+
+    setResultMessage(
+      payload.appointment.calendarSyncStatus === "synced"
+        ? "Booking saved and synced to the connected calendar."
+        : "Booking saved in LeadLock. Calendar sync needs attention."
+    );
     reset();
   };
 
@@ -63,9 +73,9 @@ export function BookingForm() {
       <Button disabled={isSubmitting} size="lg" type="submit">
         {isSubmitting ? "Booking..." : "Confirm Booking"}
       </Button>
-      {submitted ? (
+      {resultMessage ? (
         <p className="text-sm text-emerald-700">
-          Booking saved in LeadLock. Dashboard appointments will now reflect the new record.
+          {resultMessage}
         </p>
       ) : null}
     </form>

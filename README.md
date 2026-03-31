@@ -89,6 +89,10 @@ Current schema:
   - `status`
   - `assigned_to`
   - `notes`
+  - `external_calendar_event_id`
+  - `calendar_sync_status`
+  - `calendar_provider`
+  - `calendar_sync_error`
 
 - `calls`
   - `id`
@@ -142,3 +146,21 @@ When a booking is created, LeadLock now triggers a provider-agnostic confirmatio
 - Env var: `MESSAGING_PROVIDER`
 - Message records persist to `outbound_messages`
 - Dashboard follow-ups read from saved outbound message records rather than mock-only data
+
+## Google Calendar Sync
+
+When a booking is created, LeadLock now attempts to sync an external calendar event.
+
+- Provider selection env var: `CALENDAR_PROVIDER`
+- Supported values today: `mock`, `google`
+- Appointment records persist:
+  - `external_calendar_event_id`
+  - `calendar_sync_status`
+  - `calendar_provider`
+  - `calendar_sync_error`
+- Google Calendar env vars:
+  - `GOOGLE_CALENDAR_ID`
+  - `GOOGLE_CLIENT_ID`
+  - `GOOGLE_CLIENT_SECRET`
+  - `GOOGLE_REFRESH_TOKEN`
+  - `GOOGLE_CALENDAR_TIMEZONE`
