@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  BriefcaseBusiness,
   CalendarDays,
   LayoutDashboard,
   PhoneCall,
@@ -17,6 +18,8 @@ export const marketingNav = [
 
 export const dashboardNav = [
   { href: "/app", label: "Overview", icon: LayoutDashboard },
+  { href: "/app/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { href: "/app/employees", label: "Employees", icon: Users },
   { href: "/app/calls", label: "Calls", icon: PhoneCall },
   { href: "/app/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/app/leads", label: "Leads", icon: Users },

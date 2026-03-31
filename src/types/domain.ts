@@ -1,5 +1,34 @@
 export type LeadStatus = "new" | "contacted" | "qualified" | "booked" | "won";
 export type CalendarSyncStatus = "pending" | "synced" | "failed";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+export type EmployeeRole = "technician" | "dispatcher" | "manager";
+export type AppointmentStatus =
+  | "scheduled"
+  | "dispatched"
+  | "en_route"
+  | "on_site"
+  | "completed"
+  | "canceled";
+
+export interface Employee {
+  id: string;
+  name: string;
+  role: EmployeeRole;
+  phone: string;
+  email?: string;
+  active: boolean;
+}
+
+export interface ProofAsset {
+  id: string;
+  appointmentId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  url: string;
+  storedFileName: string;
+}
 
 export interface Lead {
   id: string;
@@ -20,13 +49,49 @@ export interface Appointment {
   customerName: string;
   service: string;
   scheduledFor: string;
-  status: "confirmed" | "pending" | "completed";
+  status: AppointmentStatus;
   assignedTo: string;
+  assignedEmployeeId?: string;
+  assignedEmployee?: Employee;
   notes?: string;
+  completionNotes?: string;
+  completionSignatureName?: string;
+  proofAssets: ProofAsset[];
+  proofAssetCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+  assignedAt?: string;
+  dispatchedAt?: string;
+  enRouteAt?: string;
+  onSiteAt?: string;
+  completedAt?: string;
+  canceledAt?: string;
   externalCalendarEventId?: string;
   calendarProvider?: string;
   calendarSyncError?: string;
   calendarSyncStatus: CalendarSyncStatus;
+  paymentStatus: PaymentStatus;
+  paymentProvider?: string;
+  paymentAmountCents?: number;
+  paymentCheckoutUrl?: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  appointmentId: string;
+  amountCents: number;
+  currency: string;
+  status: PaymentStatus;
+  provider: string;
+  checkoutUrl?: string;
+  externalCheckoutSessionId?: string;
+  externalPaymentIntentId?: string;
+  externalChargeId?: string;
+  externalRefundId?: string;
+  description: string;
+  failureReason?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CallLog {

@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { bookingFormSchema, type BookingFormValues } from "@/lib/validators/forms";
 
 export function BookingForm() {
   const [resultMessage, setResultMessage] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -36,13 +38,18 @@ export function BookingForm() {
     const payload = (await response.json()) as {
       appointment: {
         calendarSyncStatus: "pending" | "synced" | "failed";
+        paymentStatus: "pending" | "paid" | "failed" | "refunded";
+        paymentCheckoutUrl?: string;
       };
     };
 
+    setCheckoutUrl(payload.appointment.paymentCheckoutUrl ?? null);
     setResultMessage(
-      payload.appointment.calendarSyncStatus === "synced"
-        ? "Booking saved and synced to the connected calendar."
-        : "Booking saved in LeadLock. Calendar sync needs attention."
+      payload.appointment.paymentCheckoutUrl
+        ? "Booking saved. Your payment request is ready, and the dashboard will track the result."
+        : payload.appointment.calendarSyncStatus === "synced"
+          ? "Booking saved and synced to the connected calendar."
+          : "Booking saved in LeadLock. Calendar sync needs attention."
     );
     reset();
   };
@@ -74,9 +81,22 @@ export function BookingForm() {
         {isSubmitting ? "Booking..." : "Confirm Booking"}
       </Button>
       {resultMessage ? (
-        <p className="text-sm text-emerald-700">
-          {resultMessage}
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-emerald-700">{resultMessage}</p>
+          {checkoutUrl ? (
+            <Link
+              className={buttonVariants({
+                className: "w-full sm:w-auto",
+                variant: "outline"
+              })}
+              href={checkoutUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              Continue to Payment
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </form>
   );

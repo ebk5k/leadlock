@@ -2,27 +2,38 @@ import { ArrowRight, CalendarDays, PhoneCall, TrendingUp, Users } from "lucide-r
 
 import { CalendarSyncBadge } from "@/components/dashboard/calendar-sync-badge";
 import { DataTableCard } from "@/components/dashboard/data-table-card";
+import { JobStatusBadge } from "@/components/dashboard/job-status-badge";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { PaymentStatusBadge } from "@/components/dashboard/payment-status-badge";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { CallLogTable } from "@/components/dashboard/call-log-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { appointmentService } from "@/lib/services/appointment-service";
+import { employeeService } from "@/lib/services/employee-service";
 import { leadService } from "@/lib/services/lead-service";
 import { receptionistService } from "@/lib/services/receptionist-service";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function AppOverviewPage() {
-  const [leads, appointments, calls] = await Promise.all([
+  const [leads, appointments, calls, employees] = await Promise.all([
     leadService.getLeads(),
     appointmentService.getAppointments(),
-    receptionistService.getCalls()
+    receptionistService.getCalls(),
+    employeeService.getEmployees()
   ]);
   const answeredCalls = calls.filter((call) => call.outcome === "answered").length;
-  const bookedAppointments = appointments.filter((appointment) => appointment.status !== "completed").length;
+  const activeJobs = appointments.filter(
+    (appointment) => appointment.status !== "completed" && appointment.status !== "canceled"
+  ).length;
   const syncedAppointments = appointments.filter(
     (appointment) => appointment.calendarSyncStatus === "synced"
+  ).length;
+  const paidAppointments = appointments.filter((appointment) => appointment.paymentStatus === "paid").length;
+  const activeEmployees = employees.filter((employee) => employee.active).length;
+  const completedWithProof = appointments.filter(
+    (appointment) => appointment.status === "completed" && appointment.proofAssetCount > 0
   ).length;
 
   return (
@@ -45,15 +56,15 @@ export default async function AppOverviewPage() {
           eyebrow="Calls"
           label="Calls answered"
           value={String(answeredCalls)}
-          change="1 same-day booking"
+          change={`${activeEmployees} active employees in rotation`}
           tone="success"
           icon={<PhoneCall className="h-4 w-4" />}
         />
         <StatCard
           eyebrow="Scheduling"
-          label="Booked appointments"
-          value={String(bookedAppointments)}
-          change={`${syncedAppointments} synced to calendar`}
+          label="Active jobs"
+          value={String(activeJobs)}
+          change={`${syncedAppointments} synced, ${paidAppointments} paid, ${completedWithProof} completed with proof`}
           icon={<CalendarDays className="h-4 w-4" />}
         />
         <StatCard
@@ -68,7 +79,7 @@ export default async function AppOverviewPage() {
       <div className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <DataTableCard
           title="Upcoming appointments"
-          description="Appointments now save sync state alongside the booking record."
+          description="Appointments now save dispatch progress, payment state, calendar sync, and proof-of-work details alongside the booking record."
           action={<Badge>Next 3 jobs</Badge>}
         >
           <table className="hidden min-w-full text-sm md:table">
@@ -79,6 +90,8 @@ export default async function AppOverviewPage() {
                 <th className="px-5 py-3">Time</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3">Calendar</th>
+                <th className="px-5 py-3">Payment</th>
+                <th className="px-5 py-3">Proof</th>
               </tr>
             </thead>
             <tbody>
@@ -88,10 +101,22 @@ export default async function AppOverviewPage() {
                   <td className="px-5 py-4 text-muted-foreground">{appointment.service}</td>
                   <td className="px-5 py-4 text-muted-foreground">{formatDateTime(appointment.scheduledFor)}</td>
                   <td className="px-5 py-4">
-                    <Badge>{appointment.status}</Badge>
+                    <JobStatusBadge status={appointment.status} />
                   </td>
                   <td className="px-5 py-4">
                     <CalendarSyncBadge status={appointment.calendarSyncStatus} />
+                  </td>
+                  <td className="px-5 py-4">
+                    <PaymentStatusBadge status={appointment.paymentStatus} />
+                  </td>
+                  <td className="px-5 py-4">
+                    {appointment.proofAssetCount > 0 ? (
+                      <Badge className="bg-emerald-100 text-emerald-700">
+                        {appointment.proofAssetCount} proof
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Pending</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -106,14 +131,20 @@ export default async function AppOverviewPage() {
                     <p className="mt-1 text-sm text-muted-foreground">{appointment.service}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <Badge>{appointment.status}</Badge>
+                    <JobStatusBadge status={appointment.status} />
                     <CalendarSyncBadge status={appointment.calendarSyncStatus} />
+                    <PaymentStatusBadge status={appointment.paymentStatus} />
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
                   <span>{formatDateTime(appointment.scheduledFor)}</span>
-                  <span>{appointment.assignedTo}</span>
+                  <span>{appointment.assignedEmployee?.name ?? appointment.assignedTo}</span>
                 </div>
+                {appointment.proofAssetCount > 0 ? (
+                  <p className="mt-2 text-xs text-emerald-700">
+                    {appointment.proofAssetCount} proof asset{appointment.proofAssetCount === 1 ? "" : "s"} attached
+                  </p>
+                ) : null}
               </Card>
             ))}
           </div>

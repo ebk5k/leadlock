@@ -88,11 +88,20 @@ Current schema:
   - `scheduled_for`
   - `status`
   - `assigned_to`
+  - `assigned_employee_id`
   - `notes`
   - `external_calendar_event_id`
   - `calendar_sync_status`
   - `calendar_provider`
   - `calendar_sync_error`
+
+- `employees`
+  - `id`
+  - `name`
+  - `role`
+  - `phone`
+  - `email`
+  - `active`
 
 - `calls`
   - `id`
@@ -114,6 +123,23 @@ Current schema:
   - `outcome`
   - `status`
   - `created_at`
+
+- `payments`
+  - `id`
+  - `appointment_id`
+  - `amount_cents`
+  - `currency`
+  - `status`
+  - `provider`
+  - `description`
+  - `checkout_url`
+  - `external_checkout_session_id`
+  - `external_payment_intent_id`
+  - `external_charge_id`
+  - `external_refund_id`
+  - `failure_reason`
+  - `created_at`
+  - `updated_at`
 
 ## Webhook Ingestion
 
@@ -164,3 +190,90 @@ When a booking is created, LeadLock now attempts to sync an external calendar ev
   - `GOOGLE_CLIENT_SECRET`
   - `GOOGLE_REFRESH_TOKEN`
   - `GOOGLE_CALENDAR_TIMEZONE`
+
+## Payments
+
+When a booking is created, LeadLock now creates a provider-agnostic payment request and persists the payment state separately from scheduling.
+
+- Provider selection env var: `PAYMENT_PROVIDER`
+- Supported values today: `mock`, `stripe`
+- Stripe env vars:
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - `STRIPE_CURRENCY`
+  - `DEFAULT_APPOINTMENT_AMOUNT_CENTS`
+- Secure Stripe webhook endpoint:
+  - `POST /api/webhooks/stripe`
+  - Requires the standard `Stripe-Signature` header
+- Current webhook handling updates persisted payment state for:
+  - `checkout.session.completed`
+  - `checkout.session.async_payment_succeeded`
+  - `checkout.session.async_payment_failed`
+  - `checkout.session.expired`
+  - `payment_intent.payment_failed`
+  - `charge.refunded`
+
+## Dispatch And Field Ops
+
+Appointments now support a first-pass dispatch loop for field execution.
+
+- Execution statuses:
+  - `scheduled`
+  - `dispatched`
+  - `en_route`
+  - `on_site`
+  - `completed`
+  - `canceled`
+- Assignment remains intentionally simple for MVP:
+  - `assigned_to`
+  - `assigned_at`
+- Additional job timestamps now persist for future ops analytics:
+  - `created_at`
+  - `updated_at`
+  - `dispatched_at`
+  - `en_route_at`
+  - `on_site_at`
+  - `completed_at`
+  - `canceled_at`
+- Worker-facing route:
+  - `/app/jobs`
+- Update endpoint:
+  - `PATCH /api/appointments/:appointmentId`
+
+## Employees
+
+LeadLock now has a real employee foundation layer for dispatch assignment.
+
+- Employee management route:
+  - `/app/employees`
+- Employee API:
+  - `GET /api/employees`
+  - `POST /api/employees`
+- Appointments can now reference a real employee record through `assigned_employee_id`
+- Backward compatibility:
+  - legacy `assigned_to` text is still preserved and displayed if an older appointment does not yet point to a saved employee
+
+## Proof Of Work
+
+Completed jobs can now store closeout details for field execution.
+
+- Appointment fields:
+  - `completion_notes`
+  - `completion_signature_name`
+- New `proof_assets` table:
+  - `id`
+  - `appointment_id`
+  - `file_name`
+  - `mime_type`
+  - `size_bytes`
+  - `storage_path`
+  - `created_at`
+- Completion route:
+  - `POST /api/appointments/:appointmentId/complete`
+  - accepts multipart form data with:
+    - `completionNotes`
+    - `completionSignatureName`
+    - one or more `proofFiles`
+- Proof asset delivery route:
+  - `GET /api/proof-assets/:assetId`
+- This stays modular so customer approvals, richer reports, and true signature capture can plug in later.
