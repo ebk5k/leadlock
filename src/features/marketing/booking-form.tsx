@@ -7,10 +7,11 @@ import { useForm } from "react-hook-form";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { bookingFormSchema, type BookingFormValues } from "@/lib/validators/forms";
 
-export function BookingForm() {
+export function BookingForm({ services }: { services: string[] }) {
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const {
@@ -64,7 +65,18 @@ export function BookingForm() {
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Service</label>
-          <Input placeholder="Emergency plumbing" {...register("service")} />
+          {services.length > 0 ? (
+            <Select defaultValue="" {...register("service")}>
+              <option value="">Select a service</option>
+              {services.map((service) => (
+                <option key={service} value={service}>
+                  {service}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <Input placeholder="Emergency plumbing" {...register("service")} />
+          )}
           {errors.service ? <p className="text-sm text-red-600">{errors.service.message}</p> : null}
         </div>
       </div>

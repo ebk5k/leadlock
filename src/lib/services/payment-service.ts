@@ -2,10 +2,13 @@ import { unstable_noStore as noStore } from "next/cache.js";
 
 import { getDatabase } from "@/lib/data/database";
 import { mockPaymentProvider } from "@/lib/payments/mock-provider";
-import { estimateAppointmentAmount } from "@/lib/payments/pricing";
 import { stripePaymentProvider } from "@/lib/payments/stripe-provider";
+import { getCurrentBusinessId, getPersistedSettings } from "@/lib/settings/store";
+import { messagingService } from "@/lib/services/messaging-service";
 import type { PaymentProvider } from "@/lib/payments/provider";
 import type { Appointment, PaymentRecord, PaymentStatus } from "@/types/domain";
+
+const PAYMENT_REMINDER_DELAY_MINUTES = 60;
 
 function getPaymentProvider(): PaymentProvider {
   const provider = process.env.PAYMENT_PROVIDER ?? "mock";
@@ -22,6 +25,7 @@ function getPaymentProvider(): PaymentProvider {
 function mapPaymentRow(row: Record<string, unknown>): PaymentRecord {
   return {
     id: String(row.id),
+    businessId: row.business_id ? String(row.business_id) : undefined,
     appointmentId: String(row.appointment_id),
     amountCents: Number(row.amount_cents),
     currency: String(row.currency),
@@ -49,6 +53,7 @@ function findPaymentId(input: {
   externalPaymentIntentId?: string;
   externalChargeId?: string;
 }) {
+  const businessId = getCurrentBusinessId();
   if (input.paymentId) {
     return input.paymentId;
   }
@@ -58,14 +63,18 @@ function findPaymentId(input: {
       `
         SELECT id
         FROM payments
-        WHERE external_checkout_session_id = ?
-           OR external_payment_intent_id = ?
-           OR external_charge_id = ?
+        WHERE business_id = ?
+          AND (
+            external_checkout_session_id = ?
+            OR external_payment_intent_id = ?
+            OR external_charge_id = ?
+          )
         ORDER BY datetime(updated_at) DESC
         LIMIT 1
       `
     )
     .get(
+      businessId,
       input.externalCheckoutSessionId ?? null,
       input.externalPaymentIntentId ?? null,
       input.externalChargeId ?? null
@@ -87,6 +96,7 @@ function updatePaymentRecord(
     failureReason?: string;
   }
 ) {
+  const businessId = getCurrentBusinessId();
   getDatabase()
     .prepare(
       `
@@ -100,7 +110,7 @@ function updatePaymentRecord(
             external_refund_id = COALESCE(?, external_refund_id),
             failure_reason = ?,
             updated_at = ?
-        WHERE id = ?
+        WHERE business_id = ? AND id = ?
       `
     )
     .run(
@@ -113,12 +123,62 @@ function updatePaymentRecord(
       input.externalRefundId ?? null,
       input.failureReason ?? null,
       new Date().toISOString(),
+      businessId,
       paymentId
     );
 }
 
+function isPaymentReminderEligible(payment: PaymentRecord) {
+  if (payment.status === "paid" || payment.status === "refunded") {
+    return false;
+  }
+
+  const referenceTime = new Date(payment.updatedAt);
+  const ageMinutes = (Date.now() - referenceTime.getTime()) / (1000 * 60);
+
+  return Number.isFinite(ageMinutes) && ageMinutes >= PAYMENT_REMINDER_DELAY_MINUTES;
+}
+
+function getAppointmentSummaryForPayment(paymentId: string) {
+  const businessId = getCurrentBusinessId();
+  const row = getDatabase()
+    .prepare(
+      `
+        SELECT
+          a.id,
+          a.customer_name,
+          a.service,
+          p.checkout_url
+        FROM payments p
+        INNER JOIN appointments a ON a.id = p.appointment_id AND a.business_id = p.business_id
+        WHERE p.business_id = ? AND p.id = ?
+        LIMIT 1
+      `
+    )
+    .get(businessId, paymentId) as
+    | {
+        id?: string;
+        customer_name?: string;
+        service?: string;
+        checkout_url?: string | null;
+      }
+    | undefined;
+
+  if (!row?.id || !row.customer_name || !row.service) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    customerName: row.customer_name,
+    service: row.service,
+    paymentCheckoutUrl: row.checkout_url ?? undefined
+  };
+}
+
 export interface PaymentService {
   getPayments(): Promise<PaymentRecord[]>;
+  getPaymentById(paymentId: string): Promise<PaymentRecord | null>;
   createAppointmentPaymentRequest(input: { appointment: Appointment; baseUrl: string }): Promise<PaymentRecord>;
   markPaid(input: {
     paymentId?: string;
@@ -144,28 +204,64 @@ export interface PaymentService {
 export const paymentService: PaymentService = {
   async getPayments() {
     noStore();
+    const businessId = getCurrentBusinessId();
 
     const rows = getDatabase()
       .prepare(
         `
           SELECT *
           FROM payments
+          WHERE business_id = ?
           ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
         `
       )
-      .all() as Array<Record<string, unknown>>;
+      .all(businessId) as Array<Record<string, unknown>>;
 
-    return rows.map(mapPaymentRow);
+    const payments = rows.map(mapPaymentRow);
+    const reminderCandidates = payments.filter(isPaymentReminderEligible);
+
+    await Promise.all(
+      reminderCandidates.map(async (payment) => {
+        const appointment = getAppointmentSummaryForPayment(payment.id);
+
+        if (!appointment) {
+          return null;
+        }
+
+        return messagingService.triggerPaymentReminder({ payment, appointment });
+      })
+    );
+
+    return payments;
+  },
+  async getPaymentById(paymentId) {
+    noStore();
+    const businessId = getCurrentBusinessId();
+
+    const row = getDatabase()
+      .prepare(
+        `
+          SELECT *
+          FROM payments
+          WHERE business_id = ? AND id = ?
+          LIMIT 1
+        `
+      )
+      .get(businessId, paymentId) as Record<string, unknown> | undefined;
+
+    return row ? mapPaymentRow(row) : null;
   },
 
   async createAppointmentPaymentRequest({ appointment, baseUrl }) {
     const provider = getPaymentProvider();
+    const settings = getPersistedSettings();
     const now = new Date().toISOString();
     const payment: PaymentRecord = {
       id: `pay-${crypto.randomUUID()}`,
+      businessId: getCurrentBusinessId(),
       appointmentId: appointment.id,
-      amountCents: estimateAppointmentAmount(appointment.service),
-      currency: process.env.STRIPE_CURRENCY ?? "usd",
+      amountCents: settings.defaultJobPriceCents,
+      currency: settings.currency,
       status: "pending",
       provider: provider.name,
       description: `${appointment.service} booking for ${appointment.customerName}`,
@@ -177,14 +273,15 @@ export const paymentService: PaymentService = {
       .prepare(
         `
           INSERT INTO payments (
-            id, appointment_id, amount_cents, currency, status, provider, description, checkout_url,
+            id, business_id, appointment_id, amount_cents, currency, status, provider, description, checkout_url,
             external_checkout_session_id, external_payment_intent_id, external_charge_id,
             external_refund_id, failure_reason, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
         payment.id,
+        payment.businessId ?? getCurrentBusinessId(),
         payment.appointmentId,
         payment.amountCents,
         payment.currency,

@@ -62,6 +62,20 @@ export function DemoPreviewSection() {
               </Link>
             </div>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[
+              { label: "Leads captured", value: "128", helper: "Saved from web forms and tracked in one dashboard" },
+              { label: "Calls handled", value: "31", helper: "Answered, missed, and voicemail activity all logged" },
+              { label: "Bookings created", value: "44", helper: "From inquiry to appointment with a cleaner path" },
+              { label: "Recoveries triggered", value: "19", helper: "Missed calls and cold leads nudged automatically" }
+            ].map((item) => (
+              <Card className="rounded-3xl p-4 shadow-none" key={item.label}>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-950">{item.value}</p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.helper}</p>
+              </Card>
+            ))}
+          </div>
         </div>
 
         <MockBrowserFrame
@@ -81,10 +95,10 @@ export function DemoPreviewSection() {
                 </Card>
               ))}
             </div>
-            <div className="rounded-3xl bg-slate-950 p-5 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold">System timeline</p>
+              <div className="rounded-3xl bg-slate-950 p-5 text-white">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">System timeline</p>
                   <p className="text-xs text-white/60">Mock UI for the demo page</p>
                 </div>
                 <Badge className="bg-white/10 text-white">Preview</Badge>
@@ -102,11 +116,19 @@ export function DemoPreviewSection() {
                     </div>
                   </div>
                 ))}
+                </div>
               </div>
+              <Card className="rounded-3xl bg-slate-50 p-5 shadow-none">
+                <p className="text-sm font-semibold text-slate-950">What owners understand quickly</p>
+                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+                  This is not a pitch for a prettier homepage alone. It is a demo of a system that
+                  captures demand, handles calls, creates bookings, tracks payments, and recovers
+                  missed opportunities.
+                </p>
+              </Card>
             </div>
-          </div>
-        </MockBrowserFrame>
-      </div>
+          </MockBrowserFrame>
+        </div>
     </SectionShell>
   );
 }

@@ -13,7 +13,6 @@ interface StripeCheckoutSessionResponse {
 
 interface StripeConfig {
   secretKey: string;
-  currency: string;
 }
 
 function getStripeConfig(): StripeConfig {
@@ -24,8 +23,7 @@ function getStripeConfig(): StripeConfig {
   }
 
   return {
-    secretKey,
-    currency: process.env.STRIPE_CURRENCY ?? "usd"
+    secretKey
   };
 }
 
@@ -67,10 +65,7 @@ export const stripePaymentProvider: PaymentProvider = {
         Authorization: `Bearer ${config.secretKey}`,
         "Content-Type": "application/x-www-form-urlencoded"
       },
-      body: buildFormBody({
-        ...input,
-        currency: config.currency
-      })
+      body: buildFormBody(input)
     });
 
     const payload = (await response.json()) as StripeCheckoutSessionResponse;

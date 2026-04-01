@@ -12,7 +12,13 @@ import { Button } from "@/components/ui/button";
 import { dashboardNav } from "@/lib/constants/navigation";
 import { cn } from "@/lib/utils";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  onboardingCompleted
+}: {
+  children: ReactNode;
+  onboardingCompleted: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -38,6 +44,26 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         </Container>
+        {!onboardingCompleted ? (
+          <Container className="pb-3">
+            <div className="flex flex-col gap-3 rounded-3xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-semibold">Finish business setup</p>
+                <p className="text-amber-800">
+                  Complete onboarding to set services, working hours, pricing, and default message templates.
+                </p>
+              </div>
+              {pathname !== "/app/onboarding" ? (
+                <Link
+                  className="text-sm font-semibold text-amber-950 underline-offset-4 hover:underline"
+                  href="/app/onboarding"
+                >
+                  Open setup wizard
+                </Link>
+              ) : null}
+            </div>
+          </Container>
+        ) : null}
         <Container className="pb-3 lg:hidden">
           <nav className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {dashboardNav.map((item) => (

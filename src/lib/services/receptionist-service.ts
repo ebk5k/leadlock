@@ -2,10 +2,28 @@ import { unstable_noStore as noStore } from "next/cache.js";
 
 import { getDatabase } from "@/lib/data/database";
 import { receptionistInteractions } from "@/lib/mock-data/calls";
+import { getCurrentBusinessId } from "@/lib/settings/store";
+import { messagingService } from "@/lib/services/messaging-service";
 import type { CallLog, ReceptionistInteraction } from "@/types/domain";
+
+function mapCallRow(row: Record<string, unknown>): CallLog {
+  return {
+    id: String(row.id),
+    businessId: row.business_id ? String(row.business_id) : undefined,
+    callerName: String(row.caller_name),
+    callerNumber: row.caller_number ? String(row.caller_number) : undefined,
+    timestamp: String(row.timestamp),
+    summary: String(row.summary),
+    transcriptPreview: String(row.transcript_preview),
+    callStatus: row.call_status as CallLog["callStatus"],
+    outcome: row.outcome as CallLog["outcome"],
+    durationMinutes: Number(row.duration_minutes)
+  };
+}
 
 export interface ReceptionistService {
   getCalls(): Promise<CallLog[]>;
+  getCallById(callId: string): Promise<CallLog | null>;
   getInteractions(): Promise<ReceptionistInteraction[]>;
   createCall(input: {
     id: string;
@@ -23,12 +41,14 @@ export interface ReceptionistService {
 export const receptionistService: ReceptionistService = {
   async getCalls() {
     noStore();
+    const businessId = getCurrentBusinessId();
 
     const rows = getDatabase()
       .prepare(
         `
           SELECT
             id,
+            business_id,
             caller_name,
             caller_number,
             timestamp,
@@ -38,22 +58,40 @@ export const receptionistService: ReceptionistService = {
             outcome,
             duration_minutes
           FROM calls
+          WHERE business_id = ?
           ORDER BY datetime(timestamp) DESC
         `
       )
-      .all() as Array<Record<string, unknown>>;
+      .all(businessId) as Array<Record<string, unknown>>;
 
-    return rows.map((row) => ({
-      id: String(row.id),
-      callerName: String(row.caller_name),
-      callerNumber: row.caller_number ? String(row.caller_number) : undefined,
-      timestamp: String(row.timestamp),
-      summary: String(row.summary),
-      transcriptPreview: String(row.transcript_preview),
-      callStatus: row.call_status as CallLog["callStatus"],
-      outcome: row.outcome as CallLog["outcome"],
-      durationMinutes: Number(row.duration_minutes)
-    }));
+    return rows.map(mapCallRow);
+  },
+  async getCallById(callId) {
+    noStore();
+    const businessId = getCurrentBusinessId();
+
+    const row = getDatabase()
+      .prepare(
+        `
+          SELECT
+            id,
+            business_id,
+            caller_name,
+            caller_number,
+            timestamp,
+            summary,
+            transcript_preview,
+            call_status,
+            outcome,
+            duration_minutes
+          FROM calls
+          WHERE business_id = ? AND id = ?
+          LIMIT 1
+        `
+      )
+      .get(businessId, callId) as Record<string, unknown> | undefined;
+
+    return row ? mapCallRow(row) : null;
   },
   async getInteractions() {
     return Promise.resolve(receptionistInteractions);
@@ -61,6 +99,7 @@ export const receptionistService: ReceptionistService = {
   async createCall(input) {
     const call: CallLog = {
       id: input.id,
+      businessId: getCurrentBusinessId(),
       callerName: input.callerName,
       callerNumber: input.callerNumber,
       timestamp: input.timestamp,
@@ -76,6 +115,7 @@ export const receptionistService: ReceptionistService = {
         `
           INSERT OR REPLACE INTO calls (
             id,
+            business_id,
             caller_name,
             caller_number,
             timestamp,
@@ -84,11 +124,12 @@ export const receptionistService: ReceptionistService = {
             call_status,
             outcome,
             duration_minutes
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
         call.id,
+        call.businessId ?? getCurrentBusinessId(),
         call.callerName,
         call.callerNumber ?? null,
         call.timestamp,
@@ -98,6 +139,8 @@ export const receptionistService: ReceptionistService = {
         call.outcome,
         call.durationMinutes
       );
+
+    await messagingService.triggerMissedCallRecovery({ call });
 
     return call;
   }

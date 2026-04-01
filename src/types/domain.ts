@@ -2,6 +2,7 @@ export type LeadStatus = "new" | "contacted" | "qualified" | "booked" | "won";
 export type CalendarSyncStatus = "pending" | "synced" | "failed";
 export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
 export type EmployeeRole = "technician" | "dispatcher" | "manager";
+export type BusinessClientStatus = "active" | "launching" | "inactive";
 export type AppointmentStatus =
   | "scheduled"
   | "dispatched"
@@ -12,11 +13,30 @@ export type AppointmentStatus =
 
 export interface Employee {
   id: string;
+  businessId?: string;
   name: string;
   role: EmployeeRole;
   phone: string;
   email?: string;
   active: boolean;
+}
+
+export interface BusinessClient {
+  id: string;
+  name: string;
+  status: BusinessClientStatus;
+  createdAt: string;
+}
+
+export interface EmployeePerformanceSnapshot {
+  employee: Employee;
+  jobsAssigned: number;
+  jobsCompleted: number;
+  activeJobs: number;
+  inProgressJobs: number;
+  paidRevenueCents: number;
+  averageCompletionDurationMinutes: number | null;
+  utilizationPercent: number;
 }
 
 export interface ProofAsset {
@@ -32,6 +52,7 @@ export interface ProofAsset {
 
 export interface Lead {
   id: string;
+  businessId?: string;
   name: string;
   business?: string;
   email?: string;
@@ -46,6 +67,7 @@ export interface Lead {
 
 export interface Appointment {
   id: string;
+  businessId?: string;
   customerName: string;
   service: string;
   scheduledFor: string;
@@ -71,6 +93,7 @@ export interface Appointment {
   calendarSyncError?: string;
   calendarSyncStatus: CalendarSyncStatus;
   paymentStatus: PaymentStatus;
+  paymentId?: string;
   paymentProvider?: string;
   paymentAmountCents?: number;
   paymentCheckoutUrl?: string;
@@ -78,6 +101,7 @@ export interface Appointment {
 
 export interface PaymentRecord {
   id: string;
+  businessId?: string;
   appointmentId: string;
   amountCents: number;
   currency: string;
@@ -96,6 +120,7 @@ export interface PaymentRecord {
 
 export interface CallLog {
   id: string;
+  businessId?: string;
   callerName: string;
   callerNumber?: string;
   callStatus: "queued" | "ringing" | "in_progress" | "completed" | "failed";
@@ -116,11 +141,18 @@ export interface ReceptionistInteraction {
 
 export interface FollowUpEvent {
   id: string;
+  businessId?: string;
   leadName: string;
   channel: "sms" | "email" | "call";
   status: "pending" | "sent" | "failed";
   outcome: string;
   timestamp: string;
+  appointmentId?: string;
+  messageType?: string;
+  triggerSource?: "automatic" | "manual";
+  relatedCallId?: string;
+  relatedLeadId?: string;
+  relatedPaymentId?: string;
 }
 
 export interface AnalyticsPoint {
@@ -138,15 +170,76 @@ export interface AnalyticsSnapshot {
   sources: Array<{ source: string; value: number }>;
 }
 
+export interface LaunchReadinessFlags {
+  calendarProviderConfigured: boolean;
+  paymentProviderConfigured: boolean;
+}
+
+export interface InstallChecklistFlags {
+  phoneAiReceptionistVerified: boolean;
+  testBookingVerified: boolean;
+  testPaymentVerified: boolean;
+  launchApproved: boolean;
+}
+
+export interface LaunchReadinessItem {
+  key:
+    | "business_info"
+    | "services"
+    | "working_hours"
+    | "message_templates"
+    | "calendar_provider"
+    | "payment_provider";
+  label: string;
+  description: string;
+  ready: boolean;
+  source: "automatic" | "manual";
+}
+
+export interface LaunchReadinessSnapshot {
+  totalItems: number;
+  readyItems: number;
+  items: LaunchReadinessItem[];
+}
+
+export interface InstallChecklistItem {
+  key:
+    | "onboarding_completed"
+    | "services_configured"
+    | "working_hours_configured"
+    | "calendar_connected"
+    | "payment_provider_connected"
+    | "messaging_templates_configured"
+    | "phone_ai_receptionist_verified"
+    | "test_booking_verified"
+    | "test_payment_verified"
+    | "launch_approved";
+  label: string;
+  description: string;
+  ready: boolean;
+  source: "automatic" | "manual";
+}
+
+export interface InstallChecklistSnapshot {
+  totalItems: number;
+  readyItems: number;
+  items: InstallChecklistItem[];
+}
+
 export interface BusinessSettings {
+  businessId: string;
+  businessClient: BusinessClient;
   businessName: string;
-  ownerName: string;
-  phone: string;
-  email: string;
-  timezone: string;
-  businessHours: string[];
+  businessPhone: string;
+  businessEmail: string;
   services: string[];
-  aiScriptNotes: string;
-  receptionistTone: string;
-  followUpEnabled: boolean;
+  workingHours: string[];
+  defaultJobPriceCents: number;
+  currency: string;
+  confirmationMessageTemplate: string;
+  reminderMessageTemplate: string;
+  onboardingCompleted: boolean;
+  onboardingCompletedAt?: string;
+  launchReadinessFlags: LaunchReadinessFlags;
+  installChecklistFlags: InstallChecklistFlags;
 }

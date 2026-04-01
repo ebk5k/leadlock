@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, PhoneCall, Workflow } from "lucide-react";
+import { ArrowRight, CalendarDays, PhoneCall, ReceiptText, Wrench, Workflow } from "lucide-react";
 
 import { MockBrowserFrame } from "@/components/marketing/mock-browser-frame";
 import { SectionShell } from "@/components/marketing/section-shell";
@@ -29,6 +29,15 @@ const demoMoments = [
   }
 ];
 
+const demoProofPoints = [
+  { label: "Leads captured", value: "128", icon: Workflow },
+  { label: "Calls handled", value: "31", icon: PhoneCall },
+  { label: "Bookings created", value: "44", icon: CalendarDays },
+  { label: "Payments tracked", value: "22", icon: ReceiptText },
+  { label: "Jobs completed", value: "17", icon: Wrench },
+  { label: "Recovery automations", value: "19", icon: Workflow }
+];
+
 export default function DemoPage() {
   return (
     <main className="bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)]">
@@ -56,6 +65,21 @@ export default function DemoPage() {
                 ))}
               </div>
             </div>
+            <div className="rounded-[2rem] border border-border bg-white p-5 shadow-card sm:p-6">
+              <p className="text-sm font-semibold text-slate-950">What an owner should understand in under 90 seconds</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {[
+                  "LeadLock captures new demand instead of letting it leak out of the website.",
+                  "Calls, bookings, payments, and jobs now read like one operating system.",
+                  "Missed calls and quiet leads can trigger recovery follow-up automatically.",
+                  "The dashboard gives an owner a quick story they can actually act on."
+                ].map((item) => (
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700" key={item}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
 
           <MockBrowserFrame
@@ -76,13 +100,12 @@ export default function DemoPage() {
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  { label: "Leads captured", value: "128" },
-                  { label: "Calls answered", value: "31" },
-                  { label: "Jobs booked", value: "44" }
-                ].map((item) => (
+                {demoProofPoints.map((item) => (
                   <Card className="rounded-3xl p-4 shadow-none" key={item.label}>
-                    <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{item.label}</p>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <item.icon className="h-4 w-4" />
+                      <p className="text-xs uppercase tracking-[0.16em]">{item.label}</p>
+                    </div>
                     <p className="mt-2 text-2xl font-semibold text-slate-950">{item.value}</p>
                   </Card>
                 ))}
@@ -91,7 +114,8 @@ export default function DemoPage() {
                 <p className="text-sm font-semibold text-slate-950">What people are buying</p>
                 <p className="mt-2 text-sm leading-7 text-muted-foreground">
                   They are not buying a prettier layout by itself. They are buying a stronger first
-                  impression and a system that makes the business feel more responsive.
+                  impression and a system that makes the business feel more responsive, more organized,
+                  and easier to trust.
                 </p>
               </Card>
             </div>
@@ -120,7 +144,8 @@ export default function DemoPage() {
               </h2>
               <p className="mt-3 text-sm leading-7 text-white/75">
                 A local business owner should leave the page thinking: this makes us look stronger,
-                helps us respond better, and gives us a cleaner path to booked jobs.
+                helps us respond better, gives us a cleaner path to booked jobs, and shows us what is
+                happening after the lead comes in.
               </p>
               <Link
                 className={cn(
@@ -134,10 +159,10 @@ export default function DemoPage() {
               </Link>
             </Card>
             <Card className="rounded-[2rem] p-6">
-              <p className="text-sm font-semibold text-slate-950">Next action after the demo</p>
+              <p className="text-sm font-semibold text-slate-950">Best talking points after the demo</p>
               <p className="mt-2 text-sm leading-7 text-muted-foreground">
-                The natural follow-up is a tailored setup conversation around positioning, lead capture,
-                and booking flow for the business category.
+                The natural follow-up is a tailored setup conversation around lead capture, call handling,
+                booking flow, and where missed revenue is slipping away today.
               </p>
             </Card>
           </div>

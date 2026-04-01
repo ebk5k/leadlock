@@ -1,16 +1,20 @@
+import { AutomationActionButton } from "@/components/dashboard/automation-action-button";
 import { CallLogTable } from "@/components/dashboard/call-log-table";
 import { DataTableCard } from "@/components/dashboard/data-table-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { settingsService } from "@/lib/services/settings-service";
 import { receptionistService } from "@/lib/services/receptionist-service";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function CallsPage() {
-  const [calls, interactions] = await Promise.all([
+  const [calls, interactions, followUps] = await Promise.all([
     receptionistService.getCalls(),
-    receptionistService.getInteractions()
+    receptionistService.getInteractions(),
+    settingsService.getFollowUps()
   ]);
+  const recoveryEvents = followUps.filter((event) => event.messageType === "missed_call_recovery");
 
   return (
     <div className="space-y-6">
@@ -33,9 +37,12 @@ export default async function CallsPage() {
           </p>
         </Card>
         <Card className="rounded-3xl p-5">
-          <p className="text-sm text-muted-foreground">Voicemails / unknown</p>
+          <p className="text-sm text-muted-foreground">Recovery messages</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {calls.filter((call) => call.outcome === "voicemail" || call.outcome === "unknown").length}
+            {recoveryEvents.filter((event) => event.status === "sent").length}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {recoveryEvents.length} missed-call automations triggered
           </p>
         </Card>
       </div>
@@ -45,7 +52,18 @@ export default async function CallsPage() {
           description="Transcript snippets and outcomes are designed to be readable on desktop and mobile."
           action={<Badge>{calls.length} calls</Badge>}
         >
-          <CallLogTable calls={calls} />
+          <CallLogTable
+            calls={calls}
+            renderActions={(call) =>
+              call.outcome === "missed" || call.outcome === "voicemail" ? (
+                <AutomationActionButton
+                  actionType="missed_call_recovery"
+                  callId={call.id}
+                  label="Resend recovery"
+                />
+              ) : null
+            }
+          />
         </DataTableCard>
         <Card className="rounded-3xl p-5">
           <h2 className="text-lg font-semibold text-slate-950">Recent handoffs</h2>

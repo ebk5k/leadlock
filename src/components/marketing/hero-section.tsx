@@ -14,6 +14,13 @@ const trustPoints = [
   "Mobile-first layouts that look polished in every local search click"
 ];
 
+const heroProofPoints = [
+  { label: "Leads captured", value: "128" },
+  { label: "Calls handled", value: "31" },
+  { label: "Bookings created", value: "44" },
+  { label: "Payments tracked", value: "22" }
+];
+
 export function HeroSection() {
   return (
     <SectionShell className="overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(15,118,110,0.2),_transparent_28%),radial-gradient(circle_at_bottom_right,_rgba(15,23,42,0.12),_transparent_28%),linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)] pb-18 pt-12 sm:pb-24 sm:pt-16">
@@ -32,6 +39,10 @@ export function HeroSection() {
                 We don&apos;t just build websites. We install a system that helps capture leads,
                 answer calls, and book jobs automatically, so your business looks stronger and moves
                 faster from the first click.
+              </p>
+              <p className="max-w-2xl text-sm leading-7 text-slate-700 sm:text-base">
+                The demo story is simple: more leads captured, more calls handled, more bookings created,
+                clearer payment tracking, and fewer missed opportunities slipping away.
               </p>
             </div>
           </div>
@@ -79,12 +90,8 @@ export function HeroSection() {
                     <Sparkles className="h-5 w-5 text-emerald-300" />
                   </div>
                 </div>
-                <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                  {[
-                    { label: "Calls captured", value: "31" },
-                    { label: "Booking rate", value: "34%" },
-                    { label: "Callback time", value: "6 min" }
-                  ].map((item) => (
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  {heroProofPoints.map((item) => (
                     <div className="rounded-2xl bg-white/8 p-4" key={item.label}>
                       <p className="text-xs text-white/55">{item.label}</p>
                       <p className="mt-2 text-2xl font-semibold">{item.value}</p>

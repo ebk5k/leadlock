@@ -1,3 +1,4 @@
+import { AutomationActionButton } from "@/components/dashboard/automation-action-button";
 import { CalendarSyncBadge } from "@/components/dashboard/calendar-sync-badge";
 import { DataTableCard } from "@/components/dashboard/data-table-card";
 import { JobOpsList } from "@/components/dashboard/job-ops-list";
@@ -8,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { appointmentService } from "@/lib/services/appointment-service";
 import { employeeService } from "@/lib/services/employee-service";
+import { paymentService } from "@/lib/services/payment-service";
+import { settingsService } from "@/lib/services/settings-service";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 export default async function AppointmentsPage() {
@@ -15,14 +18,40 @@ export default async function AppointmentsPage() {
     appointmentService.getAppointments(),
     employeeService.getEmployees()
   ]);
+  await paymentService.getPayments();
+  const followUps = await settingsService.getFollowUps();
+  const paymentReminders = followUps.filter((event) => event.messageType === "payment_reminder");
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Scheduling"
         title="Appointments"
-        description="A simple appointment queue with dispatch status, assignment, calendar sync, and payment state."
+        description="A simple appointment queue with dispatch status, assignment, calendar sync, payment state, and unpaid reminder visibility."
       />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="rounded-3xl p-5">
+          <p className="text-sm text-muted-foreground">Payments pending</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {appointments.filter((appointment) => appointment.paymentStatus === "pending").length}
+          </p>
+        </Card>
+        <Card className="rounded-3xl p-5">
+          <p className="text-sm text-muted-foreground">Payment failures</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {appointments.filter((appointment) => appointment.paymentStatus === "failed").length}
+          </p>
+        </Card>
+        <Card className="rounded-3xl p-5">
+          <p className="text-sm text-muted-foreground">Payment reminders sent</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {paymentReminders.filter((event) => event.status === "sent").length}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {paymentReminders.length} unpaid recovery follow-ups created
+          </p>
+        </Card>
+      </div>
       <div className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
         <DataTableCard
           title="Scheduled work"
@@ -86,6 +115,22 @@ export default async function AppointmentsPage() {
                           Open checkout
                         </a>
                       ) : null}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <AutomationActionButton
+                          actionType="booking_confirmation"
+                          appointmentId={appointment.id}
+                          label="Resend confirmation"
+                        />
+                        {appointment.paymentId &&
+                        appointment.paymentStatus !== "paid" &&
+                        appointment.paymentStatus !== "refunded" ? (
+                          <AutomationActionButton
+                            actionType="payment_reminder"
+                            paymentId={appointment.paymentId}
+                            label="Send reminder"
+                          />
+                        ) : null}
+                      </div>
                     </div>
                   </td>
                   <td className="px-5 py-4">
@@ -148,6 +193,22 @@ export default async function AppointmentsPage() {
                       Open checkout
                     </a>
                   ) : null}
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    <AutomationActionButton
+                      actionType="booking_confirmation"
+                      appointmentId={appointment.id}
+                      label="Resend confirmation"
+                    />
+                    {appointment.paymentId &&
+                    appointment.paymentStatus !== "paid" &&
+                    appointment.paymentStatus !== "refunded" ? (
+                      <AutomationActionButton
+                        actionType="payment_reminder"
+                        paymentId={appointment.paymentId}
+                        label="Send reminder"
+                      />
+                    ) : null}
+                  </div>
                   {appointment.calendarSyncError ? <p>{appointment.calendarSyncError}</p> : null}
                 </div>
               </Card>

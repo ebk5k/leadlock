@@ -1,12 +1,15 @@
+import { AutomationActionButton } from "@/components/dashboard/automation-action-button";
 import { DataTableCard } from "@/components/dashboard/data-table-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { leadService } from "@/lib/services/lead-service";
+import { settingsService } from "@/lib/services/settings-service";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
 
 export default async function LeadsPage() {
-  const leads = await leadService.getLeads();
+  const [leads, followUps] = await Promise.all([leadService.getLeads(), settingsService.getFollowUps()]);
+  const leadRecoveries = followUps.filter((event) => event.messageType === "no_response_lead_recovery");
 
   return (
     <div className="space-y-6">
@@ -15,7 +18,7 @@ export default async function LeadsPage() {
         title="Leads"
         description="Every incoming opportunity is staged here first, ready for future CRM expansion."
       />
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-4">
         <Card className="rounded-3xl p-5">
           <p className="text-sm text-muted-foreground">New this week</p>
           <p className="mt-2 text-3xl font-semibold text-slate-950">
@@ -34,6 +37,15 @@ export default async function LeadsPage() {
             {formatCurrency(leads.reduce((sum, lead) => sum + lead.value, 0))}
           </p>
         </Card>
+        <Card className="rounded-3xl p-5">
+          <p className="text-sm text-muted-foreground">Lead recoveries</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {leadRecoveries.filter((event) => event.status === "sent").length}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {leadRecoveries.length} no-response follow-ups created
+          </p>
+        </Card>
       </div>
       <DataTableCard
         title="Mini CRM lead list"
@@ -49,6 +61,7 @@ export default async function LeadsPage() {
               <th className="px-5 py-3">Status</th>
               <th className="px-5 py-3">Requested</th>
               <th className="px-5 py-3">Value</th>
+              <th className="px-5 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -67,6 +80,15 @@ export default async function LeadsPage() {
                 </td>
                 <td className="px-5 py-4 text-muted-foreground">{formatDateTime(lead.requestedAt)}</td>
                 <td className="px-5 py-4 text-muted-foreground">{formatCurrency(lead.value)}</td>
+                <td className="px-5 py-4">
+                  {lead.status !== "booked" && lead.status !== "won" ? (
+                    <AutomationActionButton
+                      actionType="no_response_lead_recovery"
+                      label="Send recovery"
+                      leadId={lead.id}
+                    />
+                  ) : null}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -87,6 +109,15 @@ export default async function LeadsPage() {
                 <span>{formatDateTime(lead.requestedAt)}</span>
                 <span>{formatCurrency(lead.value)}</span>
               </div>
+              {lead.status !== "booked" && lead.status !== "won" ? (
+                <div className="mt-3">
+                  <AutomationActionButton
+                    actionType="no_response_lead_recovery"
+                    label="Send recovery"
+                    leadId={lead.id}
+                  />
+                </div>
+              ) : null}
             </Card>
           ))}
         </div>

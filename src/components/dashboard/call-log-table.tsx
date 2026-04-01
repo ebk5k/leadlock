@@ -1,9 +1,17 @@
+import type { ReactNode } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/utils";
 import type { CallLog } from "@/types/domain";
 
-export function CallLogTable({ calls }: { calls: CallLog[] }) {
+export function CallLogTable({
+  calls,
+  renderActions
+}: {
+  calls: CallLog[];
+  renderActions?: (call: CallLog) => ReactNode;
+}) {
   return (
     <>
       <table className="hidden min-w-full text-sm md:table">
@@ -16,6 +24,7 @@ export function CallLogTable({ calls }: { calls: CallLog[] }) {
             <th className="px-5 py-3">Summary</th>
             <th className="px-5 py-3">Transcript preview</th>
             <th className="px-5 py-3">When</th>
+            {renderActions ? <th className="px-5 py-3">Actions</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -34,6 +43,7 @@ export function CallLogTable({ calls }: { calls: CallLog[] }) {
               <td className="px-5 py-4 text-muted-foreground">
                 {formatDateTime(call.timestamp)} • {call.durationMinutes} min
               </td>
+              {renderActions ? <td className="px-5 py-4">{renderActions(call)}</td> : null}
             </tr>
           ))}
         </tbody>
@@ -61,6 +71,7 @@ export function CallLogTable({ calls }: { calls: CallLog[] }) {
             <p className="mt-3 text-xs text-muted-foreground">
               {formatDateTime(call.timestamp)} • {call.durationMinutes} min
             </p>
+            {renderActions ? <div className="mt-3">{renderActions(call)}</div> : null}
           </Card>
         ))}
       </div>

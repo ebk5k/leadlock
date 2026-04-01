@@ -1,5 +1,22 @@
 # LeadLock
 
+## Internal Install Checklist
+
+LeadLock includes a lightweight internal delivery checklist layered on top of onboarding and launch readiness. The checklist lives in the dashboard settings and onboarding areas and tracks:
+
+- onboarding completed
+- services configured
+- working hours configured
+- calendar connected
+- payment provider connected
+- messaging templates configured
+- phone / AI receptionist verified
+- test booking verified
+- test payment verified
+- launch approved
+
+Automatic checks are reused where possible, and manual completion flags are persisted for delivery steps that are not yet practical to detect automatically.
+
 LeadLock is a mobile-first web platform for local service businesses with two connected experiences:
 
 - Public marketing site: `/`, `/demo`, `/book`, `/pricing`
@@ -70,6 +87,7 @@ Current schema:
 
 - `leads`
   - `id`
+  - `business_id`
   - `name`
   - `business`
   - `email`
@@ -83,6 +101,7 @@ Current schema:
 
 - `appointments`
   - `id`
+  - `business_id`
   - `customer_name`
   - `service`
   - `scheduled_for`
@@ -97,6 +116,7 @@ Current schema:
 
 - `employees`
   - `id`
+  - `business_id`
   - `name`
   - `role`
   - `phone`
@@ -105,6 +125,7 @@ Current schema:
 
 - `calls`
   - `id`
+  - `business_id`
   - `caller_name`
   - `caller_number`
   - `timestamp`
@@ -116,7 +137,12 @@ Current schema:
 
 - `outbound_messages`
   - `id`
+  - `business_id`
   - `appointment_id`
+  - `related_call_id`
+  - `related_lead_id`
+  - `related_payment_id`
+  - `trigger_source`
   - `lead_name`
   - `channel`
   - `message_type`
@@ -126,6 +152,7 @@ Current schema:
 
 - `payments`
   - `id`
+  - `business_id`
   - `appointment_id`
   - `amount_cents`
   - `currency`
@@ -140,6 +167,44 @@ Current schema:
   - `failure_reason`
   - `created_at`
   - `updated_at`
+
+- `system_settings`
+  - `id`
+  - `business_id`
+  - `business_name`
+  - `business_phone`
+  - `business_email`
+  - `services`
+  - `working_hours`
+  - `default_job_price_cents`
+  - `currency`
+  - `confirmation_message_template`
+  - `reminder_message_template`
+  - `onboarding_completed`
+  - `onboarding_completed_at`
+  - `launch_readiness_flags`
+
+- `business_clients`
+  - `id`
+  - `name`
+  - `status`
+  - `created_at`
+
+## Client Foundation
+
+LeadLock now includes a lightweight client foundation for future multi-business support.
+
+- `business_clients` stores the current business/client record.
+- `system_settings.business_id` associates settings, onboarding, install, and launch readiness data with that client.
+- core operational records now also carry `business_id` for the current seeded business:
+  - `leads`
+  - `appointments`
+  - `payments`
+  - `employees`
+  - `outbound_messages`
+  - `calls`
+- The current MVP remains backward compatible by seeding and using a default business client.
+- Routes and auth stay unchanged for now, but deeper tenant isolation can plug into this foundation later.
 
 ## Webhook Ingestion
 
@@ -173,6 +238,69 @@ When a booking is created, LeadLock now triggers a provider-agnostic confirmatio
 - Message records persist to `outbound_messages`
 - Dashboard follow-ups read from saved outbound message records rather than mock-only data
 
+## Revenue Recovery Automation
+
+LeadLock now creates a first-pass missed-call recovery follow-up when a call webhook is saved with a `missed` or `voicemail` outcome.
+
+- Trigger source:
+  - persisted call ingestion through `POST /api/webhooks/calls`
+- Recovery records persist to `outbound_messages`
+- Recovery records are linked back to the originating call through:
+  - `related_call_id`
+- Current automation type:
+  - `missed_call_recovery`
+- The same provider-agnostic messaging service now handles both booking confirmations and missed-call recovery, so unpaid invoice reminders, reactivation campaigns, and no-response lead follow-ups can plug into the same pattern later.
+
+## No-Response Lead Recovery
+
+LeadLock now creates a first-pass lead recovery follow-up for persisted leads that remain unbooked after a lightweight MVP delay check.
+
+- Trigger source:
+  - persisted leads loaded through the lead service
+- Current MVP delay:
+  - 30 minutes after `requested_at`
+- Eligibility guardrails:
+  - skips leads already marked `booked` or `won`
+  - skips leads that already appear attributed to an appointment by customer name
+  - skips leads that already have a saved `no_response_lead_recovery` outbound message
+- Recovery records persist to `outbound_messages`
+- Recovery records are linked back to the originating lead through:
+  - `related_lead_id`
+- Current automation type:
+  - `no_response_lead_recovery`
+
+## Payment Reminder Automation
+
+LeadLock now creates a first-pass payment reminder follow-up for unpaid payment records after a lightweight MVP delay check.
+
+- Trigger source:
+  - persisted payments loaded through the payment service
+- Current MVP delay:
+  - 60 minutes after the payment record's `updated_at`
+- Eligibility guardrails:
+  - skips payments already marked `paid` or `refunded`
+  - skips payments that already have a saved `payment_reminder` outbound message
+- Reminder records persist to `outbound_messages`
+- Reminder records are linked back to the originating payment through:
+  - `related_payment_id`
+- Current automation type:
+  - `payment_reminder`
+
+## Manual Automation Actions
+
+LeadLock now supports manual trigger/resend controls for the key outbound automations.
+
+- Supported manual actions:
+  - booking confirmation
+  - missed-call recovery
+  - no-response lead recovery
+  - payment reminder
+- Manual actions use the same `outbound_messages` history table and create a new saved message record for each intentional resend.
+- Message history now stores:
+  - `trigger_source`
+    - `automatic`
+    - `manual`
+
 ## Google Calendar Sync
 
 When a booking is created, LeadLock now attempts to sync an external calendar event.
@@ -200,8 +328,7 @@ When a booking is created, LeadLock now creates a provider-agnostic payment requ
 - Stripe env vars:
   - `STRIPE_SECRET_KEY`
   - `STRIPE_WEBHOOK_SECRET`
-  - `STRIPE_CURRENCY`
-  - `DEFAULT_APPOINTMENT_AMOUNT_CENTS`
+- Currency and default pricing now come from persisted system settings
 - Secure Stripe webhook endpoint:
   - `POST /api/webhooks/stripe`
   - Requires the standard `Stripe-Signature` header
@@ -252,6 +379,15 @@ LeadLock now has a real employee foundation layer for dispatch assignment.
 - Appointments can now reference a real employee record through `assigned_employee_id`
 - Backward compatibility:
   - legacy `assigned_to` text is still preserved and displayed if an older appointment does not yet point to a saved employee
+- Employee performance is now computed from persisted appointments and latest payment records:
+  - jobs assigned per employee
+  - jobs completed per employee
+  - active jobs per employee
+  - paid revenue per employee where attribution is available
+- Employee operations now also surface lightweight labor/utilization indicators:
+  - jobs currently in progress per employee
+  - average completion duration where timestamps are available
+  - utilization snapshot based on in-progress jobs versus completed jobs
 
 ## Proof Of Work
 
@@ -277,3 +413,27 @@ Completed jobs can now store closeout details for field execution.
 - Proof asset delivery route:
   - `GET /api/proof-assets/:assetId`
 - This stays modular so customer approvals, richer reports, and true signature capture can plug in later.
+
+## Settings
+
+LeadLock now has a persistent settings layer for core business configuration.
+
+- Settings API:
+  - `GET /api/settings`
+  - `PUT /api/settings`
+- Dashboard settings route:
+  - `/app/settings`
+- Guided onboarding route:
+  - `/app/onboarding`
+- Launch readiness is now surfaced in settings and onboarding with:
+  - automatic checks for business info, services, working hours, templates, calendar provider, and payment provider
+  - manual readiness overrides for provider setup when auto-detection is not enough yet
+- Persisted settings now drive:
+  - booking service options
+  - default pricing and currency for payment requests
+  - confirmation message templates
+- Reminder templates are stored now so reminder automation can plug in later without changing the config model.
+- Onboarding writes into the same `system_settings` record and marks setup complete with:
+  - `onboarding_completed`
+  - `onboarding_completed_at`
+- The default `/app` entry now redirects unfinished accounts into onboarding until setup is completed.

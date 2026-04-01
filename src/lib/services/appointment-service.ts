@@ -1,6 +1,7 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
 import { getDatabase } from "@/lib/data/database";
+import { getCurrentBusinessId } from "@/lib/settings/store";
 import { calendarService } from "@/lib/services/calendar-service";
 import { messagingService } from "@/lib/services/messaging-service";
 import { paymentService } from "@/lib/services/payment-service";
@@ -17,6 +18,7 @@ const nextStatusMap: Partial<Record<AppointmentStatus, AppointmentStatus>> = {
 function mapAppointmentRow(row: Record<string, unknown>): Appointment {
   return {
     id: String(row.id),
+    businessId: row.business_id ? String(row.business_id) : undefined,
     customerName: String(row.customer_name),
     service: String(row.service),
     scheduledFor: String(row.scheduled_for),
@@ -58,6 +60,7 @@ function mapAppointmentRow(row: Record<string, unknown>): Appointment {
     calendarSyncError: row.calendar_sync_error ? String(row.calendar_sync_error) : undefined,
     calendarSyncStatus: (row.calendar_sync_status as Appointment["calendarSyncStatus"]) ?? "pending",
     paymentStatus: (row.payment_status as Appointment["paymentStatus"]) ?? "pending",
+    paymentId: row.payment_id ? String(row.payment_id) : undefined,
     paymentProvider: row.payment_provider ? String(row.payment_provider) : undefined,
     paymentAmountCents:
       row.payment_amount_cents === null || row.payment_amount_cents === undefined
@@ -71,6 +74,7 @@ function buildAppointmentQuery() {
   return `
     SELECT
       a.id,
+      a.business_id,
       a.customer_name,
       a.service,
       a.scheduled_for,
@@ -104,16 +108,17 @@ function buildAppointmentQuery() {
         WHERE pa.appointment_id = a.id
       ) AS proof_asset_count,
       p.status AS payment_status,
+      p.id AS payment_id,
       p.provider AS payment_provider,
       p.amount_cents AS payment_amount_cents,
       p.checkout_url AS payment_checkout_url
     FROM appointments a
-    LEFT JOIN employees e ON e.id = a.assigned_employee_id
+    LEFT JOIN employees e ON e.id = a.assigned_employee_id AND e.business_id = a.business_id
     LEFT JOIN payments p
       ON p.id = (
         SELECT p2.id
         FROM payments p2
-        WHERE p2.appointment_id = a.id
+        WHERE p2.business_id = a.business_id AND p2.appointment_id = a.id
         ORDER BY datetime(p2.updated_at) DESC, datetime(p2.created_at) DESC
         LIMIT 1
       )
@@ -133,15 +138,16 @@ async function attachProofAssets(appointments: Appointment[]) {
 }
 
 async function getAppointmentById(appointmentId: string) {
+  const businessId = getCurrentBusinessId();
   const row = getDatabase()
     .prepare(
       `
         ${buildAppointmentQuery()}
-        WHERE a.id = ?
+        WHERE a.business_id = ? AND a.id = ?
         LIMIT 1
       `
     )
-    .get(appointmentId) as Record<string, unknown> | undefined;
+    .get(businessId, appointmentId) as Record<string, unknown> | undefined;
 
   if (!row) {
     return null;
@@ -170,6 +176,7 @@ function isValidStatusTransition(currentStatus: AppointmentStatus, nextStatus: A
 
 export interface AppointmentService {
   getAppointments(): Promise<Appointment[]>;
+  getAppointmentById(appointmentId: string): Promise<Appointment | null>;
   createAppointment(input: {
     customerName: string;
     service: string;
@@ -199,22 +206,30 @@ export interface AppointmentService {
 export const appointmentService: AppointmentService = {
   async getAppointments() {
     noStore();
+    const businessId = getCurrentBusinessId();
 
     const rows = getDatabase()
       .prepare(
         `
           ${buildAppointmentQuery()}
+          WHERE a.business_id = ?
           ORDER BY datetime(a.scheduled_for) ASC
         `
       )
-      .all() as Array<Record<string, unknown>>;
+      .all(businessId) as Array<Record<string, unknown>>;
 
     return attachProofAssets(rows.map(mapAppointmentRow));
+  },
+  async getAppointmentById(appointmentId) {
+    noStore();
+
+    return getAppointmentById(appointmentId);
   },
   async createAppointment(input) {
     const now = new Date().toISOString();
     const appointment: Appointment = {
       id: `appt-${crypto.randomUUID()}`,
+      businessId: getCurrentBusinessId(),
       customerName: input.customerName,
       service: input.service,
       scheduledFor: input.scheduledFor,
@@ -236,15 +251,16 @@ export const appointmentService: AppointmentService = {
       .prepare(
         `
           INSERT INTO appointments (
-            id, customer_name, service, scheduled_for, status, assigned_to, notes, created_at, updated_at,
+            id, business_id, customer_name, service, scheduled_for, status, assigned_to, notes, created_at, updated_at,
             assigned_at, dispatched_at, en_route_at, on_site_at, completed_at, canceled_at,
             assigned_employee_id, completion_notes, completion_signature_name, external_calendar_event_id,
             calendar_sync_status, calendar_provider, calendar_sync_error
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `
       )
       .run(
         appointment.id,
+        appointment.businessId ?? getCurrentBusinessId(),
         appointment.customerName,
         appointment.service,
         appointment.scheduledFor,
@@ -286,6 +302,7 @@ export const appointmentService: AppointmentService = {
   },
   async updateAppointmentOps(input) {
     const appointment = await getAppointmentById(input.appointmentId);
+    const businessId = getCurrentBusinessId();
 
     if (!appointment) {
       return null;
@@ -311,11 +328,11 @@ export const appointmentService: AppointmentService = {
           `
             SELECT id, name
             FROM employees
-            WHERE id = ? AND active = 1
+            WHERE business_id = ? AND id = ? AND active = 1
             LIMIT 1
           `
         )
-        .get(input.assignedEmployeeId) as { id?: string; name?: string } | undefined;
+        .get(businessId, input.assignedEmployeeId) as { id?: string; name?: string } | undefined;
 
       if (!employeeRow?.id || !employeeRow.name) {
         throw new Error("Selected employee is unavailable.");
