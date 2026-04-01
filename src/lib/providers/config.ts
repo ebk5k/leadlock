@@ -75,22 +75,26 @@ function buildGlobalFallbackConfig(
         source: "global"
       };
     case "receptionist":
-    default:
+    default: {
+      const receptionistProvider = process.env.RECEPTIONIST_PROVIDER ?? "webhook";
+      const receptionistSecrets: Record<string, string> =
+        receptionistProvider === "retell"
+          ? { apiKey: process.env.RETELL_API_KEY ?? "" }
+          : { webhookSecret: process.env.CALL_WEBHOOK_SECRET ?? "" };
       return {
         id: `global:${businessId}:receptionist`,
         businessId,
         integrationKind,
-        providerName: "webhook",
+        providerName: receptionistProvider,
         status: "active",
         config: {},
-        secrets: {
-          webhookSecret: process.env.CALL_WEBHOOK_SECRET ?? ""
-        },
+        secrets: receptionistSecrets,
         metadata: {},
         createdAt: now,
         updatedAt: now,
         source: "global"
       };
+    }
   }
 }
 
@@ -300,6 +304,10 @@ export function isBusinessProviderConfiguredSync(input: {
   if (input.integrationKind === "receptionist") {
     if (config.providerName === "webhook") {
       return Boolean(config.secrets.webhookSecret);
+    }
+
+    if (config.providerName === "retell") {
+      return Boolean(config.secrets.apiKey);
     }
 
     return Boolean(config.providerName);
