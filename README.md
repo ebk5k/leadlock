@@ -83,6 +83,25 @@ Lead and appointment records now persist to a local SQLite database.
 - Default database path: `./data/leadlock.sqlite`
 - Override with `DATABASE_PATH` in `.env.local`
 
+LeadLock now also includes a persistence adapter/repository foundation under [`src/lib/data`](/Users/user/leadlock/src/lib/data) so service logic can depend less directly on `node:sqlite`.
+
+- Why it exists:
+  - reduce direct runtime coupling to the current SQLite implementation
+  - make future migration to a production-grade database safer and more incremental
+  - keep business-scoped service logic stable while storage implementations evolve
+- Domains abstracted behind the adapter in this pass:
+  - business clients and memberships
+  - business-scoped provider configs and provider verifications
+  - install workflow state, history, reminder events, and operator notifications
+- Still SQLite-specific for now:
+  - leads
+  - appointments
+  - payments
+  - messaging/call/proof-work operational flows
+  - parts of settings and guard logic
+
+SQLite remains the active adapter implementation today, so app behavior is unchanged while the storage boundary becomes more portable.
+
 Current schema:
 
 - `leads`
@@ -168,6 +187,16 @@ Current schema:
   - `created_at`
   - `updated_at`
 
+- `proof_assets`
+  - `id`
+  - `business_id`
+  - `appointment_id`
+  - `file_name`
+  - `mime_type`
+  - `size_bytes`
+  - `storage_path`
+  - `created_at`
+
 - `system_settings`
   - `id`
   - `business_id`
@@ -183,6 +212,7 @@ Current schema:
   - `onboarding_completed`
   - `onboarding_completed_at`
   - `launch_readiness_flags`
+  - `install_checklist_flags`
 
 - `business_clients`
   - `id`
@@ -190,11 +220,106 @@ Current schema:
   - `status`
   - `created_at`
 
+- `business_provider_configs`
+  - `id`
+  - `business_id`
+  - `integration_kind`
+  - `provider_name`
+  - `status`
+  - `config_json`
+  - `secret_json`
+  - `metadata_json`
+  - `created_at`
+  - `updated_at`
+
+- `provider_verifications`
+  - `id`
+  - `business_id`
+  - `integration_kind`
+  - `verification_status`
+  - `verification_mode`
+  - `last_checked_at`
+  - `summary`
+  - `details`
+  - `checked_by_user_id`
+  - `checked_by_email`
+  - `created_at`
+  - `updated_at`
+
+- `install_workflow_steps`
+  - `id`
+  - `business_id`
+  - `step_key`
+  - `step_status`
+  - `notes`
+  - `summary`
+  - `owner_user_id`
+  - `owner_name`
+  - `owner_email`
+  - `due_date`
+  - `priority`
+  - `last_completed_at`
+  - `completed_by_user_id`
+  - `completed_by_email`
+  - `created_at`
+  - `updated_at`
+
+- `install_workflow_events`
+  - `id`
+  - `business_id`
+  - `step_key`
+  - `event_type`
+  - `summary`
+  - `notes`
+  - `owner_user_id`
+  - `owner_name`
+  - `owner_email`
+  - `due_date`
+  - `priority`
+  - `actor_user_id`
+  - `actor_email`
+  - `created_at`
+
+- `install_workflow_reminder_events`
+  - `id`
+  - `business_id`
+  - `step_id`
+  - `step_key`
+  - `reminder_type`
+  - `event_type`
+  - `summary`
+  - `owner_user_id`
+  - `owner_name`
+  - `owner_email`
+  - `actor_user_id`
+  - `actor_email`
+  - `created_at`
+  - `acknowledged_at`
+
+- `operator_notifications`
+  - `id`
+  - `business_id`
+  - `step_id`
+  - `step_key`
+  - `step_label`
+  - `operator_user_id`
+  - `operator_name`
+  - `operator_email`
+  - `reminder_event_id`
+  - `reminder_type`
+  - `notification_status`
+  - `summary`
+  - `created_at`
+  - `read_at`
+
 ## Client Foundation
 
 LeadLock now includes a lightweight client foundation for future multi-business support.
 
 - `business_clients` stores the current business/client record.
+- `auth_users` stores authenticated internal/demo identities.
+- `business_memberships` links those identities to one or more allowed businesses, with a simple `role` and active/inactive membership state for future expansion.
+- `business_provider_configs` stores business-scoped provider configuration and secrets for integrations such as payments, messaging, calendar sync, and receptionist/webhook trust.
 - `system_settings.business_id` associates settings, onboarding, install, and launch readiness data with that client.
 - core operational records now also carry `business_id` for the current seeded business:
   - `leads`
@@ -203,6 +328,115 @@ LeadLock now includes a lightweight client foundation for future multi-business 
   - `employees`
   - `outbound_messages`
   - `calls`
+- active business resolution now runs through a dedicated business context resolver:
+  - first resolves the authenticated session identity
+  - then refreshes allowed business ids from persisted memberships when available
+  - then only honors `x-leadlock-business-id` or the `leadlock_business` cookie if that requested business is authorized for the current session
+  - otherwise falls back safely to the session's active/default business
+- core services now resolve business scope through that business context layer instead of reading the settings store as the primary source of truth
+- auth/session cookies now carry:
+  - authenticated user identity
+  - allowed business ids
+  - active business id
+- active business switching now runs through a guarded internal auth route:
+  - the requested business id must belong to the current session's persisted allowed membership set
+  - the session cookie and `leadlock_business` cookie are updated together only after authorization succeeds
+- provider resolution now runs through a shared business-scoped config resolver:
+  - it first checks for an active `business_provider_configs` record for the authorized business
+  - if none exists yet, it safely falls back to the current env-based MVP/demo configuration
+  - Stripe, calendar, messaging, and receptionist webhook validation now use that centralized path
+- internal operators can now manage those business-scoped provider settings directly from the dashboard settings flow for the active business:
+  - payments
+  - calendar
+  - messaging
+  - receptionist / webhook trust
+- the install/settings UI shows whether each provider is using fallback/default config or a saved business-scoped override, which makes multi-client launch work more repeatable without code edits
+- provider verification results now persist per business in `provider_verifications`, so install teams can see:
+  - pass / fail / pending state
+  - last checked timestamp
+  - result summary and details
+  - which authenticated identity last ran the check when available
+- current verification coverage is intentionally honest and centralized:
+  - payments: validates mock mode or required Stripe config presence
+  - calendar: validates mock mode or required Google Calendar config presence
+  - messaging: validates the currently configured provider path
+  - receptionist: validates webhook trust secret presence
+  - these are currently configuration-validation checks, not full live end-to-end probes
+- launch readiness now distinguishes between provider config and provider verification more clearly:
+  - payment and calendar readiness require a successful verification result unless manually overridden
+  - messaging and receptionist verification now appear in the readiness view for the active business
+- install delivery now also persists a business-scoped install workflow in `install_workflow_steps`:
+  - provider config reviewed
+  - payments verified
+  - calendar verified
+  - messaging verified
+  - receptionist verified
+  - test booking verified
+  - test payment verified
+  - launch approved
+- provider verification now feeds install workflow automatically where appropriate:
+  - provider verification steps are verification-driven and update from the latest saved provider check
+  - operator-only steps such as provider review, booking/payment test confirmation, and launch signoff remain manual and auditable
+- install workflow steps now also support accountable delivery coordination:
+  - owner / assigned internal operator
+  - due date
+  - priority
+  - append-only structured history in `install_workflow_events`
+- structured install history records actions such as:
+  - assigned / unassigned
+  - marked complete / marked incomplete
+  - force-approved
+  - due date changed
+  - note added
+  - priority changed
+- the settings workflow UI now shows current ownership, due dates, and recent history per step, and the cross-business `/app/ops` dashboard surfaces overdue or unassigned install work across allowed businesses
+- overdue install reminder tracking now persists append-only events in `install_workflow_reminder_events`:
+  - each reminder is linked directly to the persisted install step via `step_id`
+  - reminder records also carry a `reminder_type` so future upcoming reminders can share the same model
+  - overdue reminder generated
+  - reminder acknowledged
+- reminder sweeps now run through one centralized service:
+  - manual/internal trigger today via `POST /api/install-reminders`
+  - ready for scheduled automation later without rewriting install logic
+  - can generate overdue reminders and upcoming-soon reminders
+  - uses reminder throttling so repeat sweeps do not spam duplicate reminder events
+- operator-targeted reminder delivery now persists to `operator_notifications`:
+  - each generated reminder can create one operator inbox record for the assigned owner
+  - notifications are stored business-scoped and tied back to the reminder event
+  - notifications support unread/read state for lightweight in-app coordination
+- operator workload views in `/app/ops` now group open install work by assigned operator and surface:
+  - a "My tasks" slice for the currently authenticated operator
+  - assigned businesses
+  - assigned steps
+  - due dates
+  - overdue status
+  - priority
+  - blocking step context
+- the ops dashboard now also includes an internal operator inbox:
+  - unread reminder deliveries
+  - recent upcoming/overdue coordination signals
+  - mark-read handling for in-app notification hygiene
+- overdue reminders are currently triggered through an internal manual flow:
+  - `POST /api/install-reminders` runs a reminder sweep across the current authorized ops dataset
+  - `PUT /api/install-reminders` acknowledges a reminder for a specific business step
+  - `PUT /api/operator-notifications` marks a delivered operator notification as read
+  - this is designed so scheduled automation can reuse the same service later
+- launch approval is now controlled through the install workflow:
+  - normal launch signoff is only allowed when required prerequisite steps are complete
+  - a clearly labeled force-approve path exists for manual operator override when needed
+- `/app/ops` now provides an internal client-ops dashboard for the businesses the current operator is allowed to access:
+  - business name and workspace status
+  - provider config and provider verification summaries
+  - install workflow progress and launch approval state
+  - recent delivery activity signals
+  - safe jump/switch actions into the active business setup flow
+- the client-ops dashboard reuses provider config, provider verification, install workflow, and launch readiness logic instead of duplicating cross-business status rules in the UI
+- unauthorized cookie/header-only business switching is ignored safely, so provider/webhook and service guard layers now sit on top of an authorized business context instead of an implicit request hint
+- webhook/provider and other write-sensitive paths now run through a shared business guard:
+  - explicit incoming business ids are validated against known businesses
+  - persisted record associations are preferred for payment and linked update mutations
+  - mismatched cross-business writes are blocked and logged before mutation
+- proof assets now carry direct `business_id` scope and inherit ownership from the guarded linked appointment
 - The current MVP remains backward compatible by seeding and using a default business client.
 - Routes and auth stay unchanged for now, but deeper tenant isolation can plug into this foundation later.
 

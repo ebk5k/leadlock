@@ -1,17 +1,24 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import {
+  assertRecordInBusiness,
+  getRecordBusinessAssociation,
+  resolveGuardedBusinessScope
+} from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
 import { mockPaymentProvider } from "@/lib/payments/mock-provider";
 import { stripePaymentProvider } from "@/lib/payments/stripe-provider";
-import { getCurrentBusinessId, getPersistedSettings } from "@/lib/settings/store";
+import { resolveBusinessProviderConfig } from "@/lib/providers/config";
+import { getPersistedSettings } from "@/lib/settings/store";
 import { messagingService } from "@/lib/services/messaging-service";
 import type { PaymentProvider } from "@/lib/payments/provider";
 import type { Appointment, PaymentRecord, PaymentStatus } from "@/types/domain";
 
 const PAYMENT_REMINDER_DELAY_MINUTES = 60;
 
-function getPaymentProvider(): PaymentProvider {
-  const provider = process.env.PAYMENT_PROVIDER ?? "mock";
+function getPaymentProvider(providerName: string): PaymentProvider {
+  const provider = providerName || "mock";
 
   switch (provider) {
     case "stripe":
@@ -47,44 +54,47 @@ function mapPaymentRow(row: Record<string, unknown>): PaymentRecord {
   };
 }
 
-function findPaymentId(input: {
+function findPaymentAssociation(input: {
   paymentId?: string;
   externalCheckoutSessionId?: string;
   externalPaymentIntentId?: string;
   externalChargeId?: string;
 }) {
-  const businessId = getCurrentBusinessId();
   if (input.paymentId) {
-    return input.paymentId;
+    return getRecordBusinessAssociation("payments", input.paymentId);
   }
 
   const row = getDatabase()
     .prepare(
       `
-        SELECT id
+        SELECT id, business_id
         FROM payments
-        WHERE business_id = ?
-          AND (
-            external_checkout_session_id = ?
-            OR external_payment_intent_id = ?
-            OR external_charge_id = ?
-          )
+        WHERE external_checkout_session_id = ?
+           OR external_payment_intent_id = ?
+           OR external_charge_id = ?
         ORDER BY datetime(updated_at) DESC
         LIMIT 1
       `
     )
     .get(
-      businessId,
       input.externalCheckoutSessionId ?? null,
       input.externalPaymentIntentId ?? null,
       input.externalChargeId ?? null
-    ) as { id?: string } | undefined;
+    ) as { id?: string; business_id?: string } | undefined;
 
-  return row?.id;
+  if (!row?.id || !row.business_id) {
+    return null;
+  }
+
+  return {
+    id: row.id,
+    businessId: row.business_id
+  };
 }
 
 function updatePaymentRecord(
   paymentId: string,
+  businessId: string,
   input: {
     status: PaymentStatus;
     provider?: string;
@@ -96,7 +106,6 @@ function updatePaymentRecord(
     failureReason?: string;
   }
 ) {
-  const businessId = getCurrentBusinessId();
   getDatabase()
     .prepare(
       `
@@ -139,8 +148,7 @@ function isPaymentReminderEligible(payment: PaymentRecord) {
   return Number.isFinite(ageMinutes) && ageMinutes >= PAYMENT_REMINDER_DELAY_MINUTES;
 }
 
-function getAppointmentSummaryForPayment(paymentId: string) {
-  const businessId = getCurrentBusinessId();
+function getAppointmentSummaryForPayment(paymentId: string, businessId: string) {
   const row = getDatabase()
     .prepare(
       `
@@ -170,6 +178,7 @@ function getAppointmentSummaryForPayment(paymentId: string) {
 
   return {
     id: row.id,
+    businessId,
     customerName: row.customer_name,
     service: row.service,
     paymentCheckoutUrl: row.checkout_url ?? undefined
@@ -182,12 +191,14 @@ export interface PaymentService {
   createAppointmentPaymentRequest(input: { appointment: Appointment; baseUrl: string }): Promise<PaymentRecord>;
   markPaid(input: {
     paymentId?: string;
+    businessId?: string;
     externalCheckoutSessionId?: string;
     externalPaymentIntentId?: string;
     externalChargeId?: string;
   }): Promise<void>;
   markFailed(input: {
     paymentId?: string;
+    businessId?: string;
     externalCheckoutSessionId?: string;
     externalPaymentIntentId?: string;
     externalChargeId?: string;
@@ -195,6 +206,7 @@ export interface PaymentService {
   }): Promise<void>;
   markRefunded(input: {
     paymentId?: string;
+    businessId?: string;
     externalPaymentIntentId?: string;
     externalChargeId?: string;
     externalRefundId?: string;
@@ -204,7 +216,7 @@ export interface PaymentService {
 export const paymentService: PaymentService = {
   async getPayments() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -222,7 +234,7 @@ export const paymentService: PaymentService = {
 
     await Promise.all(
       reminderCandidates.map(async (payment) => {
-        const appointment = getAppointmentSummaryForPayment(payment.id);
+        const appointment = getAppointmentSummaryForPayment(payment.id, businessId);
 
         if (!appointment) {
           return null;
@@ -236,7 +248,7 @@ export const paymentService: PaymentService = {
   },
   async getPaymentById(paymentId) {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const row = getDatabase()
       .prepare(
@@ -253,12 +265,20 @@ export const paymentService: PaymentService = {
   },
 
   async createAppointmentPaymentRequest({ appointment, baseUrl }) {
-    const provider = getPaymentProvider();
+    const businessId = await resolveGuardedBusinessScope({
+      action: "paymentService.createAppointmentPaymentRequest",
+      associatedBusinessId: appointment.businessId
+    });
+    const providerConfig = await resolveBusinessProviderConfig({
+      businessId,
+      integrationKind: "payments"
+    });
+    const provider = getPaymentProvider(providerConfig.providerName);
     const settings = getPersistedSettings();
     const now = new Date().toISOString();
     const payment: PaymentRecord = {
       id: `pay-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       appointmentId: appointment.id,
       amountCents: settings.defaultJobPriceCents,
       currency: settings.currency,
@@ -281,7 +301,7 @@ export const paymentService: PaymentService = {
       )
       .run(
         payment.id,
-        payment.businessId ?? getCurrentBusinessId(),
+        payment.businessId ?? businessId,
         payment.appointmentId,
         payment.amountCents,
         payment.currency,
@@ -299,15 +319,18 @@ export const paymentService: PaymentService = {
       );
 
     try {
-      const result = await provider.createPaymentRequest({
-        appointment,
-        amountCents: payment.amountCents,
-        currency: payment.currency,
-        baseUrl,
-        payment
-      });
+      const result = await provider.createPaymentRequest(
+        {
+          appointment,
+          amountCents: payment.amountCents,
+          currency: payment.currency,
+          baseUrl,
+          payment
+        },
+        providerConfig
+      );
 
-      updatePaymentRecord(payment.id, {
+      updatePaymentRecord(payment.id, businessId, {
         status: result.status,
         provider: result.provider,
         checkoutUrl: result.checkoutUrl,
@@ -328,7 +351,7 @@ export const paymentService: PaymentService = {
       const failureReason =
         error instanceof Error ? error.message : "Payment request creation failed.";
 
-      updatePaymentRecord(payment.id, {
+      updatePaymentRecord(payment.id, businessId, {
         status: "failed",
         failureReason
       });
@@ -343,13 +366,26 @@ export const paymentService: PaymentService = {
   },
 
   async markPaid(input) {
-    const paymentId = findPaymentId(input);
+    const paymentAssociation = findPaymentAssociation(input);
 
-    if (!paymentId) {
+    if (!paymentAssociation) {
       return;
     }
 
-    updatePaymentRecord(paymentId, {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "paymentService.markPaid",
+      requestedBusinessId: input.businessId,
+      associatedBusinessId: paymentAssociation.businessId
+    });
+
+    await assertRecordInBusiness({
+      action: "paymentService.markPaid",
+      table: "payments",
+      recordId: paymentAssociation.id,
+      expectedBusinessId: businessId
+    });
+
+    updatePaymentRecord(paymentAssociation.id, businessId, {
       status: "paid",
       externalCheckoutSessionId: input.externalCheckoutSessionId,
       externalPaymentIntentId: input.externalPaymentIntentId,
@@ -359,13 +395,26 @@ export const paymentService: PaymentService = {
   },
 
   async markFailed(input) {
-    const paymentId = findPaymentId(input);
+    const paymentAssociation = findPaymentAssociation(input);
 
-    if (!paymentId) {
+    if (!paymentAssociation) {
       return;
     }
 
-    updatePaymentRecord(paymentId, {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "paymentService.markFailed",
+      requestedBusinessId: input.businessId,
+      associatedBusinessId: paymentAssociation.businessId
+    });
+
+    await assertRecordInBusiness({
+      action: "paymentService.markFailed",
+      table: "payments",
+      recordId: paymentAssociation.id,
+      expectedBusinessId: businessId
+    });
+
+    updatePaymentRecord(paymentAssociation.id, businessId, {
       status: "failed",
       externalCheckoutSessionId: input.externalCheckoutSessionId,
       externalPaymentIntentId: input.externalPaymentIntentId,
@@ -375,13 +424,26 @@ export const paymentService: PaymentService = {
   },
 
   async markRefunded(input) {
-    const paymentId = findPaymentId(input);
+    const paymentAssociation = findPaymentAssociation(input);
 
-    if (!paymentId) {
+    if (!paymentAssociation) {
       return;
     }
 
-    updatePaymentRecord(paymentId, {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "paymentService.markRefunded",
+      requestedBusinessId: input.businessId,
+      associatedBusinessId: paymentAssociation.businessId
+    });
+
+    await assertRecordInBusiness({
+      action: "paymentService.markRefunded",
+      table: "payments",
+      recordId: paymentAssociation.id,
+      expectedBusinessId: businessId
+    });
+
+    updatePaymentRecord(paymentAssociation.id, businessId, {
       status: "refunded",
       externalPaymentIntentId: input.externalPaymentIntentId,
       externalChargeId: input.externalChargeId,

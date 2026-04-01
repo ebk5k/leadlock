@@ -1,12 +1,15 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import { resolveGuardedBusinessScope } from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
 import { mockMessagingProvider, type MessagingProvider } from "@/lib/messaging/mock-provider";
-import { getCurrentBusinessId, getPersistedSettings } from "@/lib/settings/store";
+import { resolveBusinessProviderConfig } from "@/lib/providers/config";
+import { getPersistedSettings } from "@/lib/settings/store";
 import type { Appointment, CallLog, FollowUpEvent, Lead, PaymentRecord } from "@/types/domain";
 
-function getMessagingProvider(): MessagingProvider {
-  const provider = process.env.MESSAGING_PROVIDER ?? "mock";
+function getMessagingProvider(providerName: string): MessagingProvider {
+  const provider = providerName || "mock";
 
   switch (provider) {
     case "mock":
@@ -69,8 +72,7 @@ function createOutboundMessage(input: {
     );
 }
 
-function updateOutboundMessage(event: FollowUpEvent) {
-  const businessId = getCurrentBusinessId();
+function updateOutboundMessage(event: FollowUpEvent, businessId: string) {
   getDatabase()
     .prepare(
       `
@@ -120,7 +122,7 @@ export interface MessagingService {
   triggerNoResponseLeadRecovery(input: { lead: Lead; force?: boolean }): Promise<FollowUpEvent | null>;
   triggerPaymentReminder(input: {
     payment: PaymentRecord;
-    appointment: Pick<Appointment, "id" | "customerName" | "service" | "paymentCheckoutUrl">;
+    appointment: Pick<Appointment, "id" | "businessId" | "customerName" | "service" | "paymentCheckoutUrl">;
     force?: boolean;
   }): Promise<FollowUpEvent | null>;
 }
@@ -128,7 +130,7 @@ export interface MessagingService {
 export const messagingService: MessagingService = {
   async getFollowUps() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -160,13 +162,21 @@ export const messagingService: MessagingService = {
   },
 
   async triggerBookingConfirmation({ appointment, force = false }) {
-    const provider = getMessagingProvider();
+    const businessId = await resolveGuardedBusinessScope({
+      action: "messagingService.triggerBookingConfirmation",
+      associatedBusinessId: appointment.businessId
+    });
+    const providerConfig = await resolveBusinessProviderConfig({
+      businessId,
+      integrationKind: "messaging"
+    });
+    const provider = getMessagingProvider(providerConfig.providerName);
     const settings = getPersistedSettings();
     const template = settings.confirmationMessageTemplate;
     const content = applyTemplate(template, appointment);
     const baseEvent: FollowUpEvent = {
       id: `msg-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       leadName: appointment.customerName,
       channel: "sms",
       status: "pending",
@@ -179,7 +189,7 @@ export const messagingService: MessagingService = {
 
     createOutboundMessage({
       id: baseEvent.id,
-      businessId: baseEvent.businessId ?? getCurrentBusinessId(),
+      businessId: baseEvent.businessId ?? businessId,
       appointmentId: appointment.id,
       triggerSource: force ? "manual" : "automatic",
       leadName: baseEvent.leadName,
@@ -190,11 +200,14 @@ export const messagingService: MessagingService = {
       timestamp: baseEvent.timestamp
     });
 
-    const delivery = await provider.sendMessage({
-      leadName: appointment.customerName,
-      channel: baseEvent.channel,
-      content
-    });
+    const delivery = await provider.sendMessage(
+      {
+        leadName: appointment.customerName,
+        channel: baseEvent.channel,
+        content
+      },
+      providerConfig
+    );
 
     const deliveredEvent: FollowUpEvent = {
       ...baseEvent,
@@ -205,12 +218,16 @@ export const messagingService: MessagingService = {
           : `Booking confirmation failed: ${content}`
     };
 
-    updateOutboundMessage(deliveredEvent);
+    updateOutboundMessage(deliveredEvent, businessId);
 
     return deliveredEvent;
   },
 
   async triggerMissedCallRecovery({ call, force = false }) {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "messagingService.triggerMissedCallRecovery",
+      associatedBusinessId: call.businessId
+    });
     if (call.outcome !== "missed" && call.outcome !== "voicemail") {
       return null;
     }
@@ -226,7 +243,7 @@ export const messagingService: MessagingService = {
           LIMIT 1
         `
       )
-      .get(getCurrentBusinessId(), call.id) as Record<string, unknown> | undefined);
+      .get(businessId, call.id) as Record<string, unknown> | undefined);
 
     if (existingRecovery) {
       return {
@@ -243,11 +260,15 @@ export const messagingService: MessagingService = {
       };
     }
 
-    const provider = getMessagingProvider();
+    const providerConfig = await resolveBusinessProviderConfig({
+      businessId,
+      integrationKind: "messaging"
+    });
+    const provider = getMessagingProvider(providerConfig.providerName);
     const content = buildMissedCallRecoveryContent(call);
     const baseEvent: FollowUpEvent = {
       id: `msg-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       leadName: call.callerName,
       channel: "sms",
       status: "pending",
@@ -260,7 +281,7 @@ export const messagingService: MessagingService = {
 
     createOutboundMessage({
       id: baseEvent.id,
-      businessId: baseEvent.businessId ?? getCurrentBusinessId(),
+      businessId: baseEvent.businessId ?? businessId,
       relatedCallId: call.id,
       triggerSource: force ? "manual" : "automatic",
       leadName: baseEvent.leadName,
@@ -271,11 +292,14 @@ export const messagingService: MessagingService = {
       timestamp: baseEvent.timestamp
     });
 
-    const delivery = await provider.sendMessage({
-      leadName: call.callerName,
-      channel: baseEvent.channel,
-      content
-    });
+    const delivery = await provider.sendMessage(
+      {
+        leadName: call.callerName,
+        channel: baseEvent.channel,
+        content
+      },
+      providerConfig
+    );
 
     const deliveredEvent: FollowUpEvent = {
       ...baseEvent,
@@ -286,12 +310,16 @@ export const messagingService: MessagingService = {
           : `Missed-call recovery failed: ${content}`
     };
 
-    updateOutboundMessage(deliveredEvent);
+    updateOutboundMessage(deliveredEvent, businessId);
 
     return deliveredEvent;
   },
 
   async triggerNoResponseLeadRecovery({ lead, force = false }) {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "messagingService.triggerNoResponseLeadRecovery",
+      associatedBusinessId: lead.businessId
+    });
     const existingRecovery = force
       ? undefined
       : (getDatabase()
@@ -303,7 +331,7 @@ export const messagingService: MessagingService = {
           LIMIT 1
         `
       )
-      .get(getCurrentBusinessId(), lead.id) as Record<string, unknown> | undefined);
+      .get(businessId, lead.id) as Record<string, unknown> | undefined);
 
     if (existingRecovery) {
       return {
@@ -320,12 +348,16 @@ export const messagingService: MessagingService = {
       };
     }
 
-    const provider = getMessagingProvider();
+    const providerConfig = await resolveBusinessProviderConfig({
+      businessId,
+      integrationKind: "messaging"
+    });
+    const provider = getMessagingProvider(providerConfig.providerName);
     const channel: FollowUpEvent["channel"] = lead.phone ? "sms" : "email";
     const content = buildNoResponseLeadRecoveryContent(lead);
     const baseEvent: FollowUpEvent = {
       id: `msg-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       leadName: lead.name,
       channel,
       status: "pending",
@@ -338,7 +370,7 @@ export const messagingService: MessagingService = {
 
     createOutboundMessage({
       id: baseEvent.id,
-      businessId: baseEvent.businessId ?? getCurrentBusinessId(),
+      businessId: baseEvent.businessId ?? businessId,
       relatedLeadId: lead.id,
       triggerSource: force ? "manual" : "automatic",
       leadName: baseEvent.leadName,
@@ -349,11 +381,14 @@ export const messagingService: MessagingService = {
       timestamp: baseEvent.timestamp
     });
 
-    const delivery = await provider.sendMessage({
-      leadName: lead.name,
-      channel,
-      content
-    });
+    const delivery = await provider.sendMessage(
+      {
+        leadName: lead.name,
+        channel,
+        content
+      },
+      providerConfig
+    );
 
     const deliveredEvent: FollowUpEvent = {
       ...baseEvent,
@@ -364,12 +399,17 @@ export const messagingService: MessagingService = {
           : `No-response lead recovery failed: ${content}`
     };
 
-    updateOutboundMessage(deliveredEvent);
+    updateOutboundMessage(deliveredEvent, businessId);
 
     return deliveredEvent;
   },
 
   async triggerPaymentReminder({ payment, appointment, force = false }) {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "messagingService.triggerPaymentReminder",
+      requestedBusinessId: appointment.businessId,
+      associatedBusinessId: payment.businessId
+    });
     if (payment.status === "paid" || payment.status === "refunded") {
       return null;
     }
@@ -385,7 +425,7 @@ export const messagingService: MessagingService = {
           LIMIT 1
         `
       )
-      .get(getCurrentBusinessId(), payment.id) as Record<string, unknown> | undefined);
+      .get(businessId, payment.id) as Record<string, unknown> | undefined);
 
     if (existingReminder) {
       return {
@@ -403,7 +443,11 @@ export const messagingService: MessagingService = {
       };
     }
 
-    const provider = getMessagingProvider();
+    const providerConfig = await resolveBusinessProviderConfig({
+      businessId,
+      integrationKind: "messaging"
+    });
+    const provider = getMessagingProvider(providerConfig.providerName);
     const content = buildPaymentReminderContent({
       customerName: appointment.customerName,
       service: appointment.service,
@@ -412,7 +456,7 @@ export const messagingService: MessagingService = {
     });
     const baseEvent: FollowUpEvent = {
       id: `msg-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       leadName: appointment.customerName,
       channel: "sms",
       status: "pending",
@@ -426,7 +470,7 @@ export const messagingService: MessagingService = {
 
     createOutboundMessage({
       id: baseEvent.id,
-      businessId: baseEvent.businessId ?? getCurrentBusinessId(),
+      businessId: baseEvent.businessId ?? businessId,
       appointmentId: appointment.id,
       relatedPaymentId: payment.id,
       triggerSource: force ? "manual" : "automatic",
@@ -438,11 +482,14 @@ export const messagingService: MessagingService = {
       timestamp: baseEvent.timestamp
     });
 
-    const delivery = await provider.sendMessage({
-      leadName: appointment.customerName,
-      channel: baseEvent.channel,
-      content
-    });
+    const delivery = await provider.sendMessage(
+      {
+        leadName: appointment.customerName,
+        channel: baseEvent.channel,
+        content
+      },
+      providerConfig
+    );
 
     const deliveredEvent: FollowUpEvent = {
       ...baseEvent,
@@ -453,7 +500,7 @@ export const messagingService: MessagingService = {
           : `Payment reminder failed: ${content}`
     };
 
-    updateOutboundMessage(deliveredEvent);
+    updateOutboundMessage(deliveredEvent, businessId);
 
     return deliveredEvent;
   }

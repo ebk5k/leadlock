@@ -44,16 +44,16 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>
-      <div className="flex flex-col gap-3 rounded-3xl border border-border bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="premium-panel-strong flex flex-col gap-3 rounded-3xl px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-950">
+          <p className="text-sm font-semibold text-white">
             {settings.onboardingCompleted ? "Setup is complete" : "Setup wizard still needs to be finished"}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-slate-300">
             Use onboarding for a guided business setup flow or update these values directly here.
           </p>
         </div>
-        <Link className="text-sm font-semibold text-primary underline-offset-4 hover:underline" href="/app/onboarding">
+        <Link className="text-sm font-semibold text-sky-300 underline-offset-4 hover:underline" href="/app/onboarding">
           Open setup wizard
         </Link>
       </div>
@@ -63,7 +63,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
           description="Core info the system should use in bookings, follow-up messaging, and payment setup."
         >
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-950">Business name</label>
+            <label className="text-sm font-medium text-slate-100">Business name</label>
             <Input
               onChange={(event) =>
                 setForm((current) => ({ ...current, businessName: event.target.value }))
@@ -73,7 +73,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Business phone</label>
+              <label className="text-sm font-medium text-slate-100">Business phone</label>
               <Input
                 onChange={(event) =>
                   setForm((current) => ({ ...current, businessPhone: event.target.value }))
@@ -82,7 +82,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Business email</label>
+              <label className="text-sm font-medium text-slate-100">Business email</label>
               <Input
                 onChange={(event) =>
                   setForm((current) => ({ ...current, businessEmail: event.target.value }))
@@ -100,7 +100,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Default job price (cents)</label>
+              <label className="text-sm font-medium text-slate-100">Default job price (cents)</label>
               <Input
                 min="0"
                 onChange={(event) =>
@@ -111,7 +111,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Currency</label>
+              <label className="text-sm font-medium text-slate-100">Currency</label>
               <Input
                 onChange={(event) =>
                   setForm((current) => ({ ...current, currency: event.target.value }))
@@ -121,7 +121,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
             </div>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-950">Services</label>
+            <label className="text-sm font-medium text-slate-100">Services</label>
             <Textarea
               onChange={(event) => setForm((current) => ({ ...current, services: event.target.value }))}
               placeholder="One service per line"
@@ -135,7 +135,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
           description="Simple text blocks the system can show in onboarding, booking, and later automation."
         >
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-950">Working hours</label>
+            <label className="text-sm font-medium text-slate-100">Working hours</label>
             <Textarea
               onChange={(event) =>
                 setForm((current) => ({ ...current, workingHours: event.target.value }))
@@ -151,7 +151,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
           description="Simple templates used for confirmations now and reminders later."
         >
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-950">Confirmation template</label>
+            <label className="text-sm font-medium text-slate-100">Confirmation template</label>
             <Textarea
               onChange={(event) =>
                 setForm((current) => ({
@@ -163,7 +163,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-950">Reminder template</label>
+            <label className="text-sm font-medium text-slate-100">Reminder template</label>
             <Textarea
               onChange={(event) =>
                 setForm((current) => ({
@@ -182,7 +182,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Calendar provider ready</label>
+              <label className="text-sm font-medium text-slate-100">Calendar provider ready</label>
               <Select
                 onChange={(event) =>
                   setForm((current) => ({
@@ -197,7 +197,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Payment provider ready</label>
+              <label className="text-sm font-medium text-slate-100">Payment provider ready</label>
               <Select
                 onChange={(event) =>
                   setForm((current) => ({
@@ -220,7 +220,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Phone / AI receptionist verified</label>
+              <label className="text-sm font-medium text-slate-100">Phone / AI receptionist verified</label>
               <Select
                 onChange={(event) =>
                   setForm((current) => ({
@@ -235,7 +235,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Test booking verified</label>
+              <label className="text-sm font-medium text-slate-100">Test booking verified</label>
               <Select
                 onChange={(event) =>
                   setForm((current) => ({
@@ -250,7 +250,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Test payment verified</label>
+              <label className="text-sm font-medium text-slate-100">Test payment verified</label>
               <Select
                 onChange={(event) =>
                   setForm((current) => ({
@@ -265,7 +265,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-950">Launch approved</label>
+              <label className="text-sm font-medium text-slate-100">Launch approved</label>
               <Select
                 onChange={(event) =>
                   setForm((current) => ({
@@ -283,7 +283,7 @@ export function SettingsEditor({ settings }: { settings: BusinessSettings }) {
         </SettingsFormCard>
       </div>
 
-      {errorMessage ? <p className="text-sm text-red-700">{errorMessage}</p> : null}
+      {errorMessage ? <p className="text-sm text-red-300">{errorMessage}</p> : null}
       <Button disabled={isPending} type="submit">
         {isPending ? "Saving..." : "Save settings"}
       </Button>

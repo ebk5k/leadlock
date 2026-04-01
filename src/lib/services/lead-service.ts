@@ -1,7 +1,8 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import { resolveGuardedBusinessScope } from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
-import { getCurrentBusinessId } from "@/lib/settings/store";
 import { messagingService } from "@/lib/services/messaging-service";
 import type { Lead } from "@/types/domain";
 
@@ -24,8 +25,7 @@ function mapLeadRow(row: Record<string, unknown>): Lead {
   };
 }
 
-function hasBookingAttribution(lead: Lead) {
-  const businessId = getCurrentBusinessId();
+function hasBookingAttribution(lead: Lead, businessId: string) {
   const bookingRow = getDatabase()
     .prepare(
       `
@@ -67,7 +67,7 @@ export interface LeadService {
 export const leadService: LeadService = {
   async getLeads() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -83,7 +83,7 @@ export const leadService: LeadService = {
     const leads = rows.map(mapLeadRow);
 
     const recoveryCandidates = leads.filter(
-      (lead) => isRecoveryEligible(lead) && !hasBookingAttribution(lead)
+      (lead) => isRecoveryEligible(lead) && !hasBookingAttribution(lead, businessId)
     );
 
     await Promise.all(
@@ -94,7 +94,7 @@ export const leadService: LeadService = {
   },
   async getLeadById(leadId) {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const row = getDatabase()
       .prepare(
@@ -110,9 +110,12 @@ export const leadService: LeadService = {
     return row ? mapLeadRow(row) : null;
   },
   async createLead(input) {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "leadService.createLead"
+    });
     const lead: Lead = {
       id: `lead-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       name: input.name,
       business: input.business,
       email: input.email,
@@ -135,7 +138,7 @@ export const leadService: LeadService = {
       )
       .run(
         lead.id,
-        lead.businessId ?? getCurrentBusinessId(),
+        lead.businessId ?? businessId,
         lead.name,
         lead.business ?? null,
         lead.email ?? null,

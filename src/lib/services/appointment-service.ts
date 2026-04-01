@@ -1,7 +1,8 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import { resolveGuardedBusinessScope } from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
-import { getCurrentBusinessId } from "@/lib/settings/store";
 import { calendarService } from "@/lib/services/calendar-service";
 import { messagingService } from "@/lib/services/messaging-service";
 import { paymentService } from "@/lib/services/payment-service";
@@ -105,7 +106,7 @@ function buildAppointmentQuery() {
       (
         SELECT COUNT(*)
         FROM proof_assets pa
-        WHERE pa.appointment_id = a.id
+        WHERE pa.business_id = a.business_id AND pa.appointment_id = a.id
       ) AS proof_asset_count,
       p.status AS payment_status,
       p.id AS payment_id,
@@ -137,8 +138,7 @@ async function attachProofAssets(appointments: Appointment[]) {
   }));
 }
 
-async function getAppointmentById(appointmentId: string) {
-  const businessId = getCurrentBusinessId();
+async function getAppointmentById(appointmentId: string, businessId: string) {
   const row = getDatabase()
     .prepare(
       `
@@ -206,7 +206,7 @@ export interface AppointmentService {
 export const appointmentService: AppointmentService = {
   async getAppointments() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -222,14 +222,17 @@ export const appointmentService: AppointmentService = {
   },
   async getAppointmentById(appointmentId) {
     noStore();
-
-    return getAppointmentById(appointmentId);
+    const businessId = await resolveActiveBusinessId();
+    return getAppointmentById(appointmentId, businessId);
   },
   async createAppointment(input) {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "appointmentService.createAppointment"
+    });
     const now = new Date().toISOString();
     const appointment: Appointment = {
       id: `appt-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       customerName: input.customerName,
       service: input.service,
       scheduledFor: input.scheduledFor,
@@ -260,7 +263,7 @@ export const appointmentService: AppointmentService = {
       )
       .run(
         appointment.id,
-        appointment.businessId ?? getCurrentBusinessId(),
+        appointment.businessId ?? businessId,
         appointment.customerName,
         appointment.service,
         appointment.scheduledFor,
@@ -301,12 +304,17 @@ export const appointmentService: AppointmentService = {
     return appointmentWithPayment;
   },
   async updateAppointmentOps(input) {
-    const appointment = await getAppointmentById(input.appointmentId);
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
+    const appointment = await getAppointmentById(input.appointmentId, businessId);
 
     if (!appointment) {
       return null;
     }
+
+    await resolveGuardedBusinessScope({
+      action: "appointmentService.updateAppointmentOps",
+      associatedBusinessId: appointment.businessId
+    });
 
     if (!input.assignedTo && !input.assignedEmployeeId && !input.status) {
       return appointment;
@@ -375,7 +383,7 @@ export const appointmentService: AppointmentService = {
               on_site_at = ?,
               completed_at = ?,
               canceled_at = ?
-          WHERE id = ?
+          WHERE business_id = ? AND id = ?
         `
       )
       .run(
@@ -389,17 +397,24 @@ export const appointmentService: AppointmentService = {
         onSiteAt,
         completedAt,
         canceledAt,
+        businessId,
         input.appointmentId
       );
 
-    return getAppointmentById(input.appointmentId);
+    return getAppointmentById(input.appointmentId, businessId);
   },
   async completeAppointmentWithProof(input) {
-    const appointment = await getAppointmentById(input.appointmentId);
+    const businessId = await resolveActiveBusinessId();
+    const appointment = await getAppointmentById(input.appointmentId, businessId);
 
     if (!appointment) {
       return null;
     }
+
+    await resolveGuardedBusinessScope({
+      action: "appointmentService.completeAppointmentWithProof",
+      associatedBusinessId: appointment.businessId
+    });
 
     if (appointment.status !== "on_site" && appointment.status !== "completed") {
       throw new Error("Jobs can only be completed from the on-site stage.");
@@ -420,7 +435,7 @@ export const appointmentService: AppointmentService = {
               completed_at = COALESCE(completed_at, ?),
               completion_notes = ?,
               completion_signature_name = ?
-          WHERE id = ?
+          WHERE business_id = ? AND id = ?
         `
       )
       .run(
@@ -428,10 +443,11 @@ export const appointmentService: AppointmentService = {
         now,
         input.completionNotes?.trim() ? input.completionNotes.trim() : null,
         input.completionSignatureName?.trim() ? input.completionSignatureName.trim() : null,
+        businessId,
         input.appointmentId
       );
 
-    const completedAppointment = await getAppointmentById(input.appointmentId);
+    const completedAppointment = await getAppointmentById(input.appointmentId, businessId);
 
     return completedAppointment
       ? {

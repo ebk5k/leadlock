@@ -1,7 +1,8 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import { resolveGuardedBusinessScope } from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
-import { getCurrentBusinessId } from "@/lib/settings/store";
 import type { Employee, EmployeePerformanceSnapshot, EmployeeRole } from "@/types/domain";
 
 function mapEmployeeRow(row: Record<string, unknown>): Employee {
@@ -32,7 +33,7 @@ export interface EmployeeService {
 export const employeeService: EmployeeService = {
   async getEmployees() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -49,7 +50,7 @@ export const employeeService: EmployeeService = {
   },
   async getActiveEmployees() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -66,7 +67,7 @@ export const employeeService: EmployeeService = {
   },
   async getPerformanceSnapshots() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -139,9 +140,12 @@ export const employeeService: EmployeeService = {
     }));
   },
   async createEmployee(input) {
+    const businessId = await resolveGuardedBusinessScope({
+      action: "employeeService.createEmployee"
+    });
     const employee: Employee = {
       id: `emp-${crypto.randomUUID()}`,
-      businessId: getCurrentBusinessId(),
+      businessId,
       name: input.name.trim(),
       role: input.role,
       phone: input.phone.trim(),
@@ -158,7 +162,7 @@ export const employeeService: EmployeeService = {
       )
       .run(
         employee.id,
-        employee.businessId ?? getCurrentBusinessId(),
+        employee.businessId ?? businessId,
         employee.name,
         employee.role,
         employee.phone,

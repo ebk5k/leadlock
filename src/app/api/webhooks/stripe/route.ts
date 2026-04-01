@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { resolveStripeWebhookSecret } from "@/lib/providers/config";
 import { paymentService } from "@/lib/services/payment-service";
-import { parseStripeWebhookEvent } from "@/lib/webhooks/stripe-webhook";
+import { getStripeWebhookBusinessIdHint, parseStripeWebhookEvent } from "@/lib/webhooks/stripe-webhook";
 
 function getStringValue(record: Record<string, unknown>, key: string) {
   const value = record[key];
@@ -22,7 +23,9 @@ export async function POST(request: Request) {
   let event;
 
   try {
-    event = parseStripeWebhookEvent(rawBody, signatureHeader);
+    const businessIdHint = getStripeWebhookBusinessIdHint(rawBody);
+    const webhookSecret = await resolveStripeWebhookSecret(businessIdHint);
+    event = parseStripeWebhookEvent(rawBody, signatureHeader, webhookSecret);
   } catch (error) {
     return NextResponse.json(
       {
@@ -38,11 +41,13 @@ export async function POST(request: Request) {
     typeof object.metadata === "object" && object.metadata !== null
       ? (object.metadata as Record<string, unknown>)
       : {};
+  const businessId = getStringValue(metadata, "leadlock_business_id");
 
   switch (event.type) {
     case "checkout.session.completed":
     case "checkout.session.async_payment_succeeded":
       await paymentService.markPaid({
+        businessId,
         paymentId: getStringValue(metadata, "leadlock_payment_id"),
         externalCheckoutSessionId: getStringValue(object, "id"),
         externalPaymentIntentId: getStringValue(object, "payment_intent")
@@ -51,6 +56,7 @@ export async function POST(request: Request) {
     case "checkout.session.async_payment_failed":
     case "checkout.session.expired":
       await paymentService.markFailed({
+        businessId,
         paymentId: getStringValue(metadata, "leadlock_payment_id"),
         externalCheckoutSessionId: getStringValue(object, "id"),
         externalPaymentIntentId: getStringValue(object, "payment_intent"),
@@ -64,6 +70,7 @@ export async function POST(request: Request) {
           : {};
 
       await paymentService.markFailed({
+        businessId,
         paymentId: getStringValue(metadata, "leadlock_payment_id"),
         externalPaymentIntentId: getStringValue(object, "id"),
         failureReason:
@@ -73,6 +80,7 @@ export async function POST(request: Request) {
     }
     case "charge.refunded":
       await paymentService.markRefunded({
+        businessId,
         externalChargeId: getStringValue(object, "id"),
         externalPaymentIntentId: getStringValue(object, "payment_intent"),
         externalRefundId: undefined

@@ -122,8 +122,8 @@ export default async function AppOverviewPage() {
         {ownerProofPoints.map((item) => (
           <Card className="rounded-3xl p-5" key={item.label}>
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary/80">{item.label}</p>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{item.value}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{item.helper}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-tight text-white">{item.value}</p>
+            <p className="mt-2 text-sm text-slate-300">{item.helper}</p>
           </Card>
         ))}
       </div>
@@ -163,8 +163,8 @@ export default async function AppOverviewPage() {
         <Card className="rounded-3xl p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-950">Why this demos well</p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-sm font-semibold text-white">Why this demos well</p>
+              <p className="mt-1 text-sm text-slate-300">
                 The system now shows the full owner-facing story without needing extra explanation.
               </p>
             </div>
@@ -193,13 +193,13 @@ export default async function AppOverviewPage() {
                 icon: Wrench
               }
             ].map((item) => (
-              <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4" key={item.title}>
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4" key={item.title}>
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200">
                   <item.icon className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-950">{item.title}</p>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                  <p className="text-sm font-semibold text-slate-100">{item.title}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">{item.description}</p>
                 </div>
               </div>
             ))}
@@ -220,7 +220,7 @@ export default async function AppOverviewPage() {
           action={<Badge>Next 3 jobs</Badge>}
         >
           <table className="hidden min-w-full text-sm md:table">
-            <thead className="bg-slate-50 text-muted-foreground">
+            <thead className="bg-white/5 text-slate-400">
               <tr>
                 <th className="px-5 py-3">Customer</th>
                 <th className="px-5 py-3">Service</th>
@@ -233,10 +233,10 @@ export default async function AppOverviewPage() {
             </thead>
             <tbody>
               {appointments.map((appointment) => (
-                <tr className="border-t border-border" key={appointment.id}>
-                  <td className="px-5 py-4 font-medium text-slate-950">{appointment.customerName}</td>
-                  <td className="px-5 py-4 text-muted-foreground">{appointment.service}</td>
-                  <td className="px-5 py-4 text-muted-foreground">{formatDateTime(appointment.scheduledFor)}</td>
+                <tr className="border-t border-white/10" key={appointment.id}>
+                  <td className="px-5 py-4 font-medium text-slate-100">{appointment.customerName}</td>
+                  <td className="px-5 py-4 text-slate-300">{appointment.service}</td>
+                  <td className="px-5 py-4 text-slate-300">{formatDateTime(appointment.scheduledFor)}</td>
                   <td className="px-5 py-4">
                     <JobStatusBadge status={appointment.status} />
                   </td>
@@ -252,7 +252,7 @@ export default async function AppOverviewPage() {
                         {appointment.proofAssetCount} proof
                       </Badge>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Pending</span>
+                      <span className="text-xs text-slate-400">Pending</span>
                     )}
                   </td>
                 </tr>
@@ -261,11 +261,11 @@ export default async function AppOverviewPage() {
           </table>
           <div className="grid gap-3 p-4 md:hidden">
             {appointments.map((appointment) => (
-              <Card className="rounded-2xl border border-border p-4 shadow-none" key={appointment.id}>
+              <Card className="rounded-2xl border border-white/10 bg-white/4 p-4 shadow-none" key={appointment.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-medium text-slate-950">{appointment.customerName}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">{appointment.service}</p>
+                    <p className="font-medium text-slate-100">{appointment.customerName}</p>
+                    <p className="mt-1 text-sm text-slate-300">{appointment.service}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <JobStatusBadge status={appointment.status} />
@@ -273,12 +273,12 @@ export default async function AppOverviewPage() {
                     <PaymentStatusBadge status={appointment.paymentStatus} />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-400">
                   <span>{formatDateTime(appointment.scheduledFor)}</span>
                   <span>{appointment.assignedEmployee?.name ?? appointment.assignedTo}</span>
                 </div>
                 {appointment.proofAssetCount > 0 ? (
-                  <p className="mt-2 text-xs text-emerald-700">
+                  <p className="mt-2 text-xs text-emerald-300">
                     {appointment.proofAssetCount} proof asset{appointment.proofAssetCount === 1 ? "" : "s"} attached
                   </p>
                 ) : null}
@@ -289,8 +289,8 @@ export default async function AppOverviewPage() {
         <Card className="rounded-3xl p-5">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-slate-950">Proof points to call out in a demo</p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-sm font-semibold text-white">Proof points to call out in a demo</p>
+              <p className="mt-1 text-sm text-slate-300">
                 These are the strongest signals for a service business owner seeing the system live.
               </p>
             </div>
@@ -305,7 +305,7 @@ export default async function AppOverviewPage() {
               `${completedJobs} jobs completed, with ${completedWithProof} carrying proof assets`,
               `${recoveryAutomationsTriggered} recovery automations triggered to catch missed revenue`
             ].map((item) => (
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700" key={item}>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300" key={item}>
                 {item}
               </div>
             ))}

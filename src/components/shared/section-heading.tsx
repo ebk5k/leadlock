@@ -12,18 +12,21 @@ export function SectionHeading({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div className="space-y-2">
+    <div className="premium-section flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <div className="space-y-3">
         {eyebrow ? (
-          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">{eyebrow}</p>
+          <p className="premium-kicker text-xs font-semibold">{eyebrow}</p>
         ) : null}
-        <div className="space-y-2">
-          <h2 className="text-3xl font-semibold tracking-tight text-slate-950">{title}</h2>
-          {description ? <p className="max-w-2xl text-sm text-muted-foreground">{description}</p> : null}
+        <div className="space-y-3">
+          <h2 className="max-w-4xl text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl lg:text-5xl">
+            {title}
+          </h2>
+          {description ? (
+            <p className="max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">{description}</p>
+          ) : null}
         </div>
       </div>
       {action}
     </div>
   );
 }
-

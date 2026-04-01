@@ -1,6 +1,12 @@
 import path from "node:path";
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import {
+  assertRecordInBusiness,
+  getRecordBusinessAssociation,
+  resolveGuardedBusinessScope
+} from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
 import { readProofFile, saveProofFile } from "@/lib/proof-work/storage";
 import type { ProofAsset } from "@/types/domain";
@@ -10,6 +16,7 @@ function mapProofAssetRow(row: Record<string, unknown>): ProofAsset {
 
   return {
     id: String(row.id),
+    businessId: row.business_id ? String(row.business_id) : undefined,
     appointmentId: String(row.appointment_id),
     fileName: String(row.file_name),
     mimeType: String(row.mime_type),
@@ -38,6 +45,7 @@ export interface ProofWorkService {
 export const proofWorkService: ProofWorkService = {
   async getProofAssetsForAppointments(appointmentIds) {
     noStore();
+    const businessId = await resolveActiveBusinessId();
 
     if (appointmentIds.length === 0) {
       return new Map();
@@ -47,13 +55,13 @@ export const proofWorkService: ProofWorkService = {
     const rows = getDatabase()
       .prepare(
         `
-          SELECT id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
+          SELECT id, business_id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
           FROM proof_assets
-          WHERE appointment_id IN (${placeholders})
+          WHERE business_id = ? AND appointment_id IN (${placeholders})
           ORDER BY datetime(created_at) DESC
         `
       )
-      .all(...appointmentIds) as Array<Record<string, unknown>>;
+      .all(businessId, ...appointmentIds) as Array<Record<string, unknown>>;
 
     const assetsByAppointment = new Map<string, ProofAsset[]>();
 
@@ -69,50 +77,83 @@ export const proofWorkService: ProofWorkService = {
 
   async getProofAssetById(assetId) {
     noStore();
+    const businessId = await resolveActiveBusinessId();
 
     const row = getDatabase()
       .prepare(
         `
-          SELECT id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
+          SELECT id, business_id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
           FROM proof_assets
-          WHERE id = ?
+          WHERE business_id = ? AND id = ?
           LIMIT 1
         `
       )
-      .get(assetId) as Record<string, unknown> | undefined;
-
-    return row ? mapProofAssetRow(row) : null;
-  },
-
-  async getProofAssetFile(assetId) {
-    const row = getDatabase()
-      .prepare(
-        `
-          SELECT id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
-          FROM proof_assets
-          WHERE id = ?
-          LIMIT 1
-        `
-      )
-      .get(assetId) as Record<string, unknown> | undefined;
+      .get(businessId, assetId) as Record<string, unknown> | undefined;
 
     if (!row) {
       return null;
     }
 
     const asset = mapProofAssetRow(row);
-    const bytes = await readProofFile(asset.storedFileName);
+    await assertRecordInBusiness({
+      action: "proofWorkService.getProofAssetById",
+      table: "appointments",
+      recordId: asset.appointmentId,
+      expectedBusinessId: businessId
+    });
+
+    return asset;
+  },
+
+  async getProofAssetFile(assetId) {
+    const businessId = await resolveActiveBusinessId();
+    const row = getDatabase()
+      .prepare(
+        `
+          SELECT id, business_id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
+          FROM proof_assets
+          WHERE business_id = ? AND id = ?
+          LIMIT 1
+        `
+      )
+      .get(businessId, assetId) as Record<string, unknown> | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    const asset = mapProofAssetRow(row);
+    await assertRecordInBusiness({
+      action: "proofWorkService.getProofAssetFile",
+      table: "appointments",
+      recordId: asset.appointmentId,
+      expectedBusinessId: businessId
+    });
+    const bytes = await readProofFile(String(row.storage_path));
 
     return { asset, bytes };
   },
 
   async createProofAssets({ appointmentId, files }) {
+    const appointmentAssociation = getRecordBusinessAssociation("appointments", appointmentId);
+    const businessId = await resolveGuardedBusinessScope({
+      action: "proofWorkService.createProofAssets",
+      associatedBusinessId: appointmentAssociation?.businessId
+    });
+
+    await assertRecordInBusiness({
+      action: "proofWorkService.createProofAssets",
+      table: "appointments",
+      recordId: appointmentId,
+      expectedBusinessId: businessId
+    });
+
     const createdAt = new Date().toISOString();
     const insert = getDatabase().prepare(
       `
         INSERT INTO proof_assets (
-          id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          id, business_id, appointment_id, file_name, mime_type, size_bytes, storage_path, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `
     );
 
@@ -120,6 +161,7 @@ export const proofWorkService: ProofWorkService = {
 
     for (const file of files) {
       const saved = await saveProofFile({
+        businessId,
         appointmentId,
         fileName: file.fileName,
         bytes: file.bytes
@@ -128,6 +170,7 @@ export const proofWorkService: ProofWorkService = {
 
       insert.run(
         id,
+        businessId,
         appointmentId,
         saved.fileName,
         file.mimeType,
@@ -138,6 +181,7 @@ export const proofWorkService: ProofWorkService = {
 
       assets.push({
         id,
+        businessId,
         appointmentId,
         fileName: saved.fileName,
         mimeType: file.mimeType,

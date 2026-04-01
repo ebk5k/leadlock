@@ -12,13 +12,13 @@ export function PageHeader({
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-      <div className="space-y-2">
+    <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+      <div className="space-y-3">
         {eyebrow ? (
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
+          <p className="premium-kicker text-xs font-semibold">{eyebrow}</p>
         ) : null}
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-950">{title}</h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        <h1 className="text-3xl font-semibold tracking-[-0.045em] text-white sm:text-4xl">{title}</h1>
+        <p className="max-w-2xl text-sm leading-7 text-slate-300">{description}</p>
       </div>
       {action}
     </div>

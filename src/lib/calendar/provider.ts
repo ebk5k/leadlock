@@ -1,4 +1,8 @@
-import type { Appointment, CalendarSyncStatus } from "@/types/domain";
+import type {
+  Appointment,
+  CalendarSyncStatus,
+  ResolvedBusinessProviderConfig
+} from "@/types/domain";
 
 export interface CalendarCreateEventInput {
   appointment: Appointment;
@@ -22,7 +26,7 @@ export interface CalendarSyncResult {
 
 export interface CalendarProvider {
   name: string;
-  createEvent(input: CalendarCreateEventInput): Promise<CalendarSyncResult>;
-  updateEvent(input: CalendarUpdateEventInput): Promise<CalendarSyncResult>;
-  deleteEvent(input: CalendarDeleteEventInput): Promise<void>;
+  createEvent(input: CalendarCreateEventInput, config: ResolvedBusinessProviderConfig): Promise<CalendarSyncResult>;
+  updateEvent(input: CalendarUpdateEventInput, config: ResolvedBusinessProviderConfig): Promise<CalendarSyncResult>;
+  deleteEvent(input: CalendarDeleteEventInput, config: ResolvedBusinessProviderConfig): Promise<void>;
 }

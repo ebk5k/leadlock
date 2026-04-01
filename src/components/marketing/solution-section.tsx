@@ -30,7 +30,7 @@ const solutions = [
 
 export function SolutionSection() {
   return (
-    <SectionShell className="bg-slate-50/70">
+    <SectionShell className="bg-[linear-gradient(180deg,rgba(7,10,18,0.92),rgba(9,13,25,0.9))]">
       <div className="space-y-10">
         <SectionHeading
           eyebrow="Solution"
@@ -41,13 +41,13 @@ export function SolutionSection() {
           {solutions.map((solution) => (
             <Card className="rounded-3xl p-6" key={solution.title}>
               <div className="flex items-start justify-between gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/16 text-sky-300">
                   <solution.icon className="h-5 w-5" />
                 </div>
-                <Badge className="bg-slate-100 text-slate-700">System layer</Badge>
+                <Badge className="bg-white/8 text-slate-200">System layer</Badge>
               </div>
-              <h3 className="mt-5 text-lg font-semibold text-slate-950">{solution.title}</h3>
-              <p className="mt-2 text-sm leading-7 text-muted-foreground">{solution.description}</p>
+              <h3 className="mt-5 text-lg font-semibold text-white">{solution.title}</h3>
+              <p className="mt-2 text-sm leading-7 text-slate-300">{solution.description}</p>
             </Card>
           ))}
         </div>

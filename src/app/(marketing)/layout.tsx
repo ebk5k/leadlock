@@ -5,11 +5,10 @@ import { MarketingHeader } from "@/components/marketing/marketing-header";
 
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-transparent text-white">
       <MarketingHeader />
       {children}
       <MarketingFooter />
     </div>
   );
 }
-

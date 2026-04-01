@@ -101,6 +101,55 @@ function mapSettingsRow(row: Record<string, unknown>): BusinessSettings {
   };
 }
 
+function buildFallbackSettingsForBusiness(businessClient: BusinessClient): BusinessSettings {
+  return {
+    ...defaultBusinessSettings,
+    businessId: businessClient.id,
+    businessClient,
+    businessName: businessClient.name,
+    businessPhone: defaultBusinessSettings.businessPhone,
+    businessEmail: defaultBusinessSettings.businessEmail,
+    services: [...defaultBusinessSettings.services],
+    workingHours: [...defaultBusinessSettings.workingHours],
+    defaultJobPriceCents: defaultBusinessSettings.defaultJobPriceCents,
+    currency: defaultBusinessSettings.currency,
+    confirmationMessageTemplate: defaultBusinessSettings.confirmationMessageTemplate,
+    reminderMessageTemplate: defaultBusinessSettings.reminderMessageTemplate,
+    onboardingCompleted: false,
+    onboardingCompletedAt: undefined,
+    launchReadinessFlags: {
+      ...defaultBusinessSettings.launchReadinessFlags
+    },
+    installChecklistFlags: {
+      ...defaultBusinessSettings.installChecklistFlags
+    }
+  };
+}
+
+function getBusinessClientById(businessId: string) {
+  const row = getDatabase()
+    .prepare(
+      `
+        SELECT id, name, status, created_at
+        FROM business_clients
+        WHERE id = ?
+        LIMIT 1
+      `
+    )
+    .get(businessId) as Record<string, unknown> | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    status: String(row.status) as BusinessClient["status"],
+    createdAt: String(row.created_at)
+  } satisfies BusinessClient;
+}
+
 export function getPersistedSettings() {
   const row = getDatabase()
     .prepare(
@@ -133,6 +182,45 @@ export function getPersistedSettings() {
     .get(SETTINGS_ROW_ID) as Record<string, unknown> | undefined;
 
   return row ? mapSettingsRow(row) : defaultBusinessSettings;
+}
+
+export function getPersistedSettingsForBusiness(businessId: string) {
+  const row = getDatabase()
+    .prepare(
+      `
+        SELECT
+          ss.business_id,
+          business_name,
+          business_phone,
+          business_email,
+          bc.name as client_name,
+          bc.status as client_status,
+          bc.created_at as client_created_at,
+          services,
+          working_hours,
+          default_job_price_cents,
+          currency,
+          confirmation_message_template,
+          reminder_message_template,
+          onboarding_completed,
+          onboarding_completed_at,
+          launch_readiness_flags,
+          install_checklist_flags
+        FROM system_settings ss
+        LEFT JOIN business_clients bc
+          ON bc.id = ss.business_id
+        WHERE ss.business_id = ?
+        LIMIT 1
+      `
+    )
+    .get(businessId) as Record<string, unknown> | undefined;
+
+  if (row) {
+    return mapSettingsRow(row);
+  }
+
+  const businessClient = getBusinessClientById(businessId);
+  return businessClient ? buildFallbackSettingsForBusiness(businessClient) : defaultBusinessSettings;
 }
 
 export function writePersistedSettings(settings: BusinessSettings) {
@@ -215,8 +303,4 @@ export function getDefaultBusinessSettings() {
 
 export function getPersistedBusinessClient() {
   return getPersistedSettings().businessClient;
-}
-
-export function getCurrentBusinessId() {
-  return getPersistedSettings().businessId;
 }

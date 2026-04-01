@@ -1,39 +1,21 @@
+import { isBusinessProviderConfiguredSync } from "@/lib/providers/config";
+import { hasPassedProviderVerificationSync } from "@/lib/services/provider-verification-service";
 import type { BusinessSettings, LaunchReadinessItem, LaunchReadinessSnapshot } from "@/types/domain";
 
-function isCalendarProviderAutoConfigured() {
-  const provider = process.env.CALENDAR_PROVIDER ?? "mock";
-
-  if (provider === "mock") {
-    return true;
-  }
-
-  if (provider === "google") {
-    return Boolean(
-      process.env.GOOGLE_CALENDAR_ID &&
-        process.env.GOOGLE_CLIENT_ID &&
-        process.env.GOOGLE_CLIENT_SECRET &&
-        process.env.GOOGLE_REFRESH_TOKEN
-    );
-  }
-
-  return false;
-}
-
-function isPaymentProviderAutoConfigured() {
-  const provider = process.env.PAYMENT_PROVIDER ?? "mock";
-
-  if (provider === "mock") {
-    return true;
-  }
-
-  if (provider === "stripe") {
-    return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET);
-  }
-
-  return false;
+function isProviderReady(businessId: string, integrationKind: "payments" | "calendar" | "messaging" | "receptionist") {
+  const configured = isBusinessProviderConfiguredSync({
+    businessId,
+    integrationKind
+  });
+  const verified = hasPassedProviderVerificationSync(businessId, integrationKind);
+  return { configured, verified, ready: configured && verified };
 }
 
 export function getLaunchReadiness(settings: BusinessSettings): LaunchReadinessSnapshot {
+  const calendarProvider = isProviderReady(settings.businessId, "calendar");
+  const paymentProvider = isProviderReady(settings.businessId, "payments");
+  const messagingProvider = isProviderReady(settings.businessId, "messaging");
+  const receptionistProvider = isProviderReady(settings.businessId, "receptionist");
   const items: LaunchReadinessItem[] = [
     {
       key: "business_info",
@@ -65,19 +47,31 @@ export function getLaunchReadiness(settings: BusinessSettings): LaunchReadinessS
     },
     {
       key: "calendar_provider",
-      label: "Calendar provider configured",
-      description: "Calendar sync is either auto-detected or manually marked ready for launch.",
-      ready:
-        isCalendarProviderAutoConfigured() || settings.launchReadinessFlags.calendarProviderConfigured,
-      source: isCalendarProviderAutoConfigured() ? "automatic" : "manual"
+      label: "Calendar provider ready",
+      description: "Calendar config is saved and a verification check has passed, or the install is manually marked ready.",
+      ready: calendarProvider.ready || settings.launchReadinessFlags.calendarProviderConfigured,
+      source: calendarProvider.ready ? "automatic" : "manual"
     },
     {
       key: "payment_provider",
-      label: "Payment provider configured",
-      description: "Payment collection is either auto-detected or manually marked ready for launch.",
-      ready:
-        isPaymentProviderAutoConfigured() || settings.launchReadinessFlags.paymentProviderConfigured,
-      source: isPaymentProviderAutoConfigured() ? "automatic" : "manual"
+      label: "Payment provider ready",
+      description: "Payment config is saved and a verification check has passed, or the install is manually marked ready.",
+      ready: paymentProvider.ready || settings.launchReadinessFlags.paymentProviderConfigured,
+      source: paymentProvider.ready ? "automatic" : "manual"
+    },
+    {
+      key: "messaging_provider",
+      label: "Messaging provider ready",
+      description: "Messaging config is saved and the latest verification check passed.",
+      ready: messagingProvider.ready,
+      source: "automatic"
+    },
+    {
+      key: "receptionist_provider",
+      label: "Receptionist / webhook trust ready",
+      description: "Inbound receptionist webhook trust is configured and the latest verification check passed.",
+      ready: receptionistProvider.ready,
+      source: "automatic"
     }
   ];
 

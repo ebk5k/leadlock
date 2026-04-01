@@ -1,7 +1,10 @@
 import crypto from "node:crypto";
 
+import { resolveCallWebhookSecret } from "@/lib/providers/config";
+
 export interface NormalizedCallWebhookEvent {
   id: string;
+  businessId?: string;
   callerName: string;
   callerNumber?: string;
   timestamp: string;
@@ -36,8 +39,8 @@ function normalizeOutcome(value?: string) {
   }
 }
 
-export function validateCallWebhookSecret(requestSecret?: string) {
-  const configuredSecret = process.env.CALL_WEBHOOK_SECRET;
+export async function validateCallWebhookSecret(requestSecret?: string, businessId?: string) {
+  const configuredSecret = await resolveCallWebhookSecret(businessId);
 
   if (!configuredSecret) {
     throw new Error("CALL_WEBHOOK_SECRET is not configured.");
@@ -47,10 +50,14 @@ export function validateCallWebhookSecret(requestSecret?: string) {
     return false;
   }
 
-  return crypto.timingSafeEqual(
-    Buffer.from(requestSecret),
-    Buffer.from(configuredSecret)
-  );
+  const left = Buffer.from(requestSecret);
+  const right = Buffer.from(configuredSecret);
+
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(left, right);
 }
 
 export function normalizeCallWebhookPayload(payload: Record<string, unknown>): NormalizedCallWebhookEvent {
@@ -59,6 +66,12 @@ export function normalizeCallWebhookPayload(payload: Record<string, unknown>): N
       typeof payload.id === "string"
         ? payload.id
         : `call-${crypto.randomUUID()}`,
+    businessId:
+      typeof payload.businessId === "string" && payload.businessId.trim().length > 0
+        ? payload.businessId
+        : typeof payload.business_id === "string" && payload.business_id.trim().length > 0
+          ? payload.business_id
+          : undefined,
     callerName:
       typeof payload.callerName === "string" && payload.callerName.trim().length > 0
         ? payload.callerName

@@ -1,4 +1,5 @@
 import type { CreatePaymentRequestInput, PaymentProvider } from "@/lib/payments/provider";
+import type { ResolvedBusinessProviderConfig } from "@/types/domain";
 
 const STRIPE_API_BASE = "https://api.stripe.com/v1";
 
@@ -15,8 +16,8 @@ interface StripeConfig {
   secretKey: string;
 }
 
-function getStripeConfig(): StripeConfig {
-  const secretKey = process.env.STRIPE_SECRET_KEY;
+function getStripeConfig(config: ResolvedBusinessProviderConfig): StripeConfig {
+  const secretKey = config.secrets.secretKey || process.env.STRIPE_SECRET_KEY;
 
   if (!secretKey) {
     throw new Error("Stripe payments are enabled but STRIPE_SECRET_KEY is missing.");
@@ -38,8 +39,13 @@ function buildFormBody(input: CreatePaymentRequestInput) {
   params.set("client_reference_id", input.appointment.id);
   params.set("metadata[leadlock_payment_id]", input.payment.id);
   params.set("metadata[leadlock_appointment_id]", input.appointment.id);
+  params.set("metadata[leadlock_business_id]", input.payment.businessId ?? input.appointment.businessId ?? "");
   params.set("payment_intent_data[metadata][leadlock_payment_id]", input.payment.id);
   params.set("payment_intent_data[metadata][leadlock_appointment_id]", input.appointment.id);
+  params.set(
+    "payment_intent_data[metadata][leadlock_business_id]",
+    input.payment.businessId ?? input.appointment.businessId ?? ""
+  );
   params.set("line_items[0][quantity]", "1");
   params.set("line_items[0][price_data][currency]", input.currency);
   params.set("line_items[0][price_data][unit_amount]", String(input.amountCents));
@@ -57,8 +63,8 @@ function buildFormBody(input: CreatePaymentRequestInput) {
 
 export const stripePaymentProvider: PaymentProvider = {
   name: "stripe",
-  async createPaymentRequest(input: CreatePaymentRequestInput) {
-    const config = getStripeConfig();
+  async createPaymentRequest(input: CreatePaymentRequestInput, providerConfig: ResolvedBusinessProviderConfig) {
+    const config = getStripeConfig(providerConfig);
     const response = await fetch(`${STRIPE_API_BASE}/checkout/sessions`, {
       method: "POST",
       headers: {

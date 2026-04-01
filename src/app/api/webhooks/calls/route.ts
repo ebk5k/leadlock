@@ -7,13 +7,15 @@ import {
 import { receptionistService } from "@/lib/services/receptionist-service";
 
 export async function POST(request: Request) {
+  const payload = (await request.json()) as Record<string, unknown>;
+  const normalizedCall = normalizeCallWebhookPayload(payload);
   const secret =
     request.headers.get("x-leadlock-webhook-secret") ??
     request.headers.get("x-webhook-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 
   try {
-    const valid = validateCallWebhookSecret(secret ?? undefined);
+    const valid = await validateCallWebhookSecret(secret ?? undefined, normalizedCall.businessId);
 
     if (!valid) {
       return NextResponse.json({ success: false, message: "Unauthorized webhook request." }, { status: 401 });
@@ -24,9 +26,6 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-
-  const payload = (await request.json()) as Record<string, unknown>;
-  const normalizedCall = normalizeCallWebhookPayload(payload);
   const call = await receptionistService.createCall(normalizedCall);
 
   return NextResponse.json({ success: true, call });

@@ -8,16 +8,6 @@ interface StripeEventEnvelope {
   };
 }
 
-function getStripeWebhookSecret() {
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  if (!secret) {
-    throw new Error("STRIPE_WEBHOOK_SECRET is missing.");
-  }
-
-  return secret;
-}
-
 function parseStripeSignatureHeader(value: string) {
   const parts = value.split(",").map((part) => part.trim());
   const timestamp = parts.find((part) => part.startsWith("t="))?.slice(2);
@@ -59,8 +49,28 @@ function verifyStripeSignature(rawBody: string, header: string, secret: string) 
   }
 }
 
-export function parseStripeWebhookEvent(rawBody: string, signatureHeader: string) {
-  verifyStripeSignature(rawBody, signatureHeader, getStripeWebhookSecret());
+export function getStripeWebhookBusinessIdHint(rawBody: string) {
+  try {
+    const event = JSON.parse(rawBody) as StripeEventEnvelope;
+    const object = event.data?.object;
+    const metadata =
+      typeof object?.metadata === "object" && object.metadata !== null
+        ? (object.metadata as Record<string, unknown>)
+        : {};
+    const businessId = metadata.leadlock_business_id;
+
+    return typeof businessId === "string" && businessId.trim().length > 0 ? businessId : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function parseStripeWebhookEvent(rawBody: string, signatureHeader: string, secret: string) {
+  if (!secret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET is missing.");
+  }
+
+  verifyStripeSignature(rawBody, signatureHeader, secret);
 
   const event = JSON.parse(rawBody) as StripeEventEnvelope;
 

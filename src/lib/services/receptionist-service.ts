@@ -1,8 +1,12 @@
 import { unstable_noStore as noStore } from "next/cache.js";
 
+import {
+  getRecordBusinessAssociation,
+  resolveGuardedBusinessScope
+} from "@/lib/business-guard";
+import { resolveActiveBusinessId } from "@/lib/business-context";
 import { getDatabase } from "@/lib/data/database";
 import { receptionistInteractions } from "@/lib/mock-data/calls";
-import { getCurrentBusinessId } from "@/lib/settings/store";
 import { messagingService } from "@/lib/services/messaging-service";
 import type { CallLog, ReceptionistInteraction } from "@/types/domain";
 
@@ -27,6 +31,7 @@ export interface ReceptionistService {
   getInteractions(): Promise<ReceptionistInteraction[]>;
   createCall(input: {
     id: string;
+    businessId?: string;
     callerName: string;
     callerNumber?: string;
     timestamp: string;
@@ -41,7 +46,7 @@ export interface ReceptionistService {
 export const receptionistService: ReceptionistService = {
   async getCalls() {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const rows = getDatabase()
       .prepare(
@@ -68,7 +73,7 @@ export const receptionistService: ReceptionistService = {
   },
   async getCallById(callId) {
     noStore();
-    const businessId = getCurrentBusinessId();
+    const businessId = await resolveActiveBusinessId();
 
     const row = getDatabase()
       .prepare(
@@ -97,9 +102,15 @@ export const receptionistService: ReceptionistService = {
     return Promise.resolve(receptionistInteractions);
   },
   async createCall(input) {
+    const existingCall = getRecordBusinessAssociation("calls", input.id);
+    const businessId = await resolveGuardedBusinessScope({
+      action: "receptionistService.createCall",
+      requestedBusinessId: input.businessId,
+      associatedBusinessId: existingCall?.businessId
+    });
     const call: CallLog = {
       id: input.id,
-      businessId: getCurrentBusinessId(),
+      businessId,
       callerName: input.callerName,
       callerNumber: input.callerNumber,
       timestamp: input.timestamp,
@@ -129,7 +140,7 @@ export const receptionistService: ReceptionistService = {
       )
       .run(
         call.id,
-        call.businessId ?? getCurrentBusinessId(),
+        call.businessId ?? businessId,
         call.callerName,
         call.callerNumber ?? null,
         call.timestamp,

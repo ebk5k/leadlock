@@ -1,4 +1,9 @@
-import type { Appointment, PaymentRecord, PaymentStatus } from "@/types/domain";
+import type {
+  Appointment,
+  PaymentRecord,
+  PaymentStatus,
+  ResolvedBusinessProviderConfig
+} from "@/types/domain";
 
 export interface CreatePaymentRequestInput {
   appointment: Appointment;
@@ -19,5 +24,8 @@ export interface CreatePaymentRequestResult {
 
 export interface PaymentProvider {
   name: string;
-  createPaymentRequest(input: CreatePaymentRequestInput): Promise<CreatePaymentRequestResult>;
+  createPaymentRequest(
+    input: CreatePaymentRequestInput,
+    config: ResolvedBusinessProviderConfig
+  ): Promise<CreatePaymentRequestResult>;
 }

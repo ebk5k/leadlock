@@ -1,27 +1,44 @@
 import { getInstallChecklist } from "@/lib/settings/install-checklist";
 import { getLaunchReadiness } from "@/lib/settings/launch-readiness";
-import { getPersistedSettings, writePersistedSettings } from "@/lib/settings/store";
+import {
+  getPersistedSettings,
+  getPersistedSettingsForBusiness,
+  writePersistedSettings
+} from "@/lib/settings/store";
+import { providerConfigService } from "@/lib/services/provider-config-service";
+import { installWorkflowService } from "@/lib/services/install-workflow-service";
+import { providerVerificationService } from "@/lib/services/provider-verification-service";
 import { messagingService } from "@/lib/services/messaging-service";
 import type {
   BusinessClient,
   BusinessSettings,
   FollowUpEvent,
   InstallChecklistSnapshot,
-  LaunchReadinessSnapshot
+  InstallWorkflowSnapshot,
+  LaunchReadinessSnapshot,
+  ProviderConfigView,
+  ProviderVerification
 } from "@/types/domain";
 
 export interface SettingsService {
   getSettings(): Promise<BusinessSettings>;
+  getSettingsForBusiness(businessId: string): Promise<BusinessSettings>;
   getBusinessClient(): Promise<BusinessClient>;
   updateSettings(settings: BusinessSettings): Promise<BusinessSettings>;
   getFollowUps(): Promise<FollowUpEvent[]>;
   getLaunchReadiness(): Promise<LaunchReadinessSnapshot>;
   getInstallChecklist(): Promise<InstallChecklistSnapshot>;
+  getProviderConfigs(): Promise<ProviderConfigView[]>;
+  getProviderVerifications(): Promise<ProviderVerification[]>;
+  getInstallWorkflow(): Promise<InstallWorkflowSnapshot>;
 }
 
 export const settingsService: SettingsService = {
   async getSettings() {
     return Promise.resolve(getPersistedSettings());
+  },
+  async getSettingsForBusiness(businessId) {
+    return Promise.resolve(getPersistedSettingsForBusiness(businessId));
   },
   async getBusinessClient() {
     return Promise.resolve(getPersistedSettings().businessClient);
@@ -86,5 +103,14 @@ export const settingsService: SettingsService = {
   },
   async getInstallChecklist() {
     return getInstallChecklist(getPersistedSettings());
+  },
+  async getProviderConfigs() {
+    return providerConfigService.getProviderConfigs();
+  },
+  async getProviderVerifications() {
+    return providerVerificationService.getProviderVerifications();
+  },
+  async getInstallWorkflow() {
+    return installWorkflowService.getWorkflow();
   }
 };

@@ -1,7 +1,16 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { isValidDemoLogin, SESSION_COOKIE, SESSION_MAX_AGE, SESSION_VALUE } from "@/lib/auth/session";
+import { hydrateAuthorizedSessionFromMemberships } from "@/lib/auth/memberships";
+import {
+  createAuthorizedSession,
+  isValidDemoLogin,
+  serializeAuthorizedSession,
+  SESSION_BUSINESS_MAX_AGE,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE
+} from "@/lib/auth/session";
+import { ACTIVE_BUSINESS_COOKIE } from "@/lib/business-context";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -22,12 +31,24 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, SESSION_VALUE, {
+  const initialSession = createAuthorizedSession();
+  const authorizedContext = hydrateAuthorizedSessionFromMemberships(initialSession);
+  const session = authorizedContext.session ?? initialSession;
+  const activeBusinessId = session.activeBusinessId;
+
+  cookieStore.set(SESSION_COOKIE, serializeAuthorizedSession(session), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: SESSION_MAX_AGE
+  });
+  cookieStore.set(ACTIVE_BUSINESS_COOKIE, activeBusinessId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_BUSINESS_MAX_AGE
   });
 
   return NextResponse.json({ success: true, redirectTo });

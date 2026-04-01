@@ -28,13 +28,13 @@ export function OfferSection() {
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>
         </div>
-        <Card className="rounded-[2rem] bg-slate-950 p-6 text-white sm:p-8">
-          <h3 className="text-xl font-semibold">What LeadLock is really offering</h3>
+        <Card className="premium-panel-strong rounded-[2rem] p-6 text-white sm:p-8">
+          <h3 className="text-xl font-semibold text-white">What LeadLock is really offering</h3>
           <div className="mt-5 space-y-4">
             {offerPoints.map((point) => (
-              <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4" key={point}>
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-                <p className="text-sm leading-6 text-white/80">{point}</p>
+              <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/6 p-4" key={point}>
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+                <p className="text-sm leading-6 text-slate-200">{point}</p>
               </div>
             ))}
           </div>

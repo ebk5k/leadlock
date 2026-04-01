@@ -1,11 +1,11 @@
-import type { FollowUpEvent } from "@/types/domain";
+import type { FollowUpEvent, ResolvedBusinessProviderConfig } from "@/types/domain";
 
 export interface MessagingProvider {
   sendMessage(input: {
     leadName: string;
     channel: FollowUpEvent["channel"];
     content: string;
-  }): Promise<{ status: FollowUpEvent["status"] }>;
+  }, config: ResolvedBusinessProviderConfig): Promise<{ status: FollowUpEvent["status"] }>;
 }
 
 export const mockMessagingProvider: MessagingProvider = {

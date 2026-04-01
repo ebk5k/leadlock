@@ -40,33 +40,33 @@ const demoProofPoints = [
 
 export default function DemoPage() {
   return (
-    <main className="bg-[linear-gradient(180deg,_#f8fafc_0%,_#ffffff_100%)]">
+    <main className="relative overflow-hidden">
       <SectionShell className="pb-10 pt-12 sm:pb-14 sm:pt-16">
         <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
           <div className="space-y-6">
-            <Badge className="bg-primary/10 px-4 py-2 text-primary">LeadLock Demo</Badge>
+            <Badge className="border-white/10 bg-white/6 px-4 py-2 text-sky-200">LeadLock Demo</Badge>
             <SectionHeading
               title="See how LeadLock makes a local business look premium and operate with more confidence."
               description="This demo page is still mock-powered, but it is designed to sell the experience clearly: stronger website, cleaner call handling, and a better path to booked jobs."
             />
-            <div className="rounded-[2rem] border border-border bg-white p-5 shadow-card sm:p-6">
-              <p className="text-sm font-semibold text-slate-950">What the walkthrough covers</p>
+            <div className="premium-panel rounded-[2rem] p-5 shadow-card sm:p-6">
+              <p className="text-sm font-semibold text-white">What the walkthrough covers</p>
               <div className="mt-4 grid gap-3">
                 {demoMoments.map((item) => (
-                  <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4" key={item.title}>
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 p-4" key={item.title}>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-sky-500/15 text-sky-200">
                       <item.icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-950">{item.title}</p>
-                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{item.description}</p>
+                      <p className="text-sm font-semibold text-slate-100">{item.title}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-300">{item.description}</p>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="rounded-[2rem] border border-border bg-white p-5 shadow-card sm:p-6">
-              <p className="text-sm font-semibold text-slate-950">What an owner should understand in under 90 seconds</p>
+            <div className="premium-panel rounded-[2rem] p-5 shadow-card sm:p-6">
+              <p className="text-sm font-semibold text-white">What an owner should understand in under 90 seconds</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {[
                   "LeadLock captures new demand instead of letting it leak out of the website.",
@@ -74,7 +74,7 @@ export default function DemoPage() {
                   "Missed calls and quiet leads can trigger recovery follow-up automatically.",
                   "The dashboard gives an owner a quick story they can actually act on."
                 ].map((item) => (
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700" key={item}>
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300" key={item}>
                     {item}
                   </div>
                 ))}
@@ -85,7 +85,7 @@ export default function DemoPage() {
           <MockBrowserFrame
             title="Demo walkthrough preview"
             subtitle="Placeholder product visuals for the sales story"
-            className="bg-white"
+            className="bg-transparent"
           >
             <div className="grid gap-4">
               <div className="rounded-[1.75rem] bg-slate-950 p-5 text-white">
@@ -102,17 +102,17 @@ export default function DemoPage() {
               <div className="grid gap-3 sm:grid-cols-3">
                 {demoProofPoints.map((item) => (
                   <Card className="rounded-3xl p-4 shadow-none" key={item.label}>
-                    <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="flex items-center gap-2 text-slate-400">
                       <item.icon className="h-4 w-4" />
                       <p className="text-xs uppercase tracking-[0.16em]">{item.label}</p>
                     </div>
-                    <p className="mt-2 text-2xl font-semibold text-slate-950">{item.value}</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">{item.value}</p>
                   </Card>
                 ))}
               </div>
-              <Card className="rounded-3xl bg-slate-50 p-5 shadow-none">
-                <p className="text-sm font-semibold text-slate-950">What people are buying</p>
-                <p className="mt-2 text-sm leading-7 text-muted-foreground">
+              <Card className="rounded-3xl border-white/10 bg-white/5 p-5 shadow-none">
+                <p className="text-sm font-semibold text-white">What people are buying</p>
+                <p className="mt-2 text-sm leading-7 text-slate-300">
                   They are not buying a prettier layout by itself. They are buying a stronger first
                   impression and a system that makes the business feel more responsive, more organized,
                   and easier to trust.
@@ -159,8 +159,8 @@ export default function DemoPage() {
               </Link>
             </Card>
             <Card className="rounded-[2rem] p-6">
-              <p className="text-sm font-semibold text-slate-950">Best talking points after the demo</p>
-              <p className="mt-2 text-sm leading-7 text-muted-foreground">
+              <p className="text-sm font-semibold text-white">Best talking points after the demo</p>
+              <p className="mt-2 text-sm leading-7 text-slate-300">
                 The natural follow-up is a tailored setup conversation around lead capture, call handling,
                 booking flow, and where missed revenue is slipping away today.
               </p>

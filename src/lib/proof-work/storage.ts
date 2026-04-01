@@ -9,16 +9,18 @@ function sanitizeExtension(fileName: string) {
 }
 
 export async function saveProofFile(input: {
+  businessId: string;
   appointmentId: string;
   fileName: string;
   bytes: Uint8Array;
 }) {
-  await fs.mkdir(proofRoot, { recursive: true });
+  const businessProofRoot = path.join(proofRoot, input.businessId);
+  await fs.mkdir(businessProofRoot, { recursive: true });
 
   const storedFileName = `${input.appointmentId}-${crypto.randomUUID()}${sanitizeExtension(
     input.fileName
   )}`;
-  const storedPath = path.join(proofRoot, storedFileName);
+  const storedPath = path.join(businessProofRoot, storedFileName);
 
   await fs.writeFile(storedPath, input.bytes);
 
@@ -30,7 +32,5 @@ export async function saveProofFile(input: {
 }
 
 export async function readProofFile(storedFileName: string) {
-  const storedPath = path.join(proofRoot, storedFileName);
-
-  return fs.readFile(storedPath);
+  return fs.readFile(storedFileName);
 }

@@ -2,10 +2,11 @@ import { getDatabase } from "@/lib/data/database";
 import { googleCalendarProvider } from "@/lib/calendar/google-provider";
 import { mockCalendarProvider } from "@/lib/calendar/mock-provider";
 import type { CalendarProvider } from "@/lib/calendar/provider";
+import { resolveBusinessProviderConfig } from "@/lib/providers/config";
 import type { Appointment } from "@/types/domain";
 
-function getCalendarProvider(): CalendarProvider {
-  const provider = process.env.CALENDAR_PROVIDER ?? "mock";
+function getCalendarProvider(providerName: string): CalendarProvider {
+  const provider = providerName || "mock";
 
   switch (provider) {
     case "google":
@@ -48,10 +49,14 @@ export interface CalendarService {
 
 export const calendarService: CalendarService = {
   async syncAppointmentCreated(appointment) {
-    const provider = getCalendarProvider();
+    const providerConfig = await resolveBusinessProviderConfig({
+      businessId: appointment.businessId,
+      integrationKind: "calendar"
+    });
+    const provider = getCalendarProvider(providerConfig.providerName);
 
     try {
-      const result = await provider.createEvent({ appointment });
+      const result = await provider.createEvent({ appointment }, providerConfig);
       const syncedAppointment: Appointment = {
         ...appointment,
         calendarProvider: result.provider,

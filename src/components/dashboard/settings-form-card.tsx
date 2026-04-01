@@ -14,11 +14,10 @@ export function SettingsFormCard({
   return (
     <Card className="rounded-3xl p-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-300">{description}</p>
       </div>
       <div className="mt-5 space-y-4">{children}</div>
     </Card>
   );
 }
-

@@ -5,6 +5,7 @@ import type {
   CalendarSyncResult,
   CalendarUpdateEventInput
 } from "@/lib/calendar/provider";
+import type { ResolvedBusinessProviderConfig } from "@/types/domain";
 
 const GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GOOGLE_CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3";
@@ -38,18 +39,25 @@ interface GoogleCalendarResolvedConfig {
   timeZone: string;
 }
 
-function getGoogleCalendarConfig(): GoogleCalendarConfig {
+function getGoogleCalendarConfig(providerConfig: ResolvedBusinessProviderConfig): GoogleCalendarConfig {
   return {
-    calendarId: process.env.GOOGLE_CALENDAR_ID,
-    clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    refreshToken: process.env.GOOGLE_REFRESH_TOKEN,
-    timeZone: process.env.GOOGLE_CALENDAR_TIMEZONE ?? "America/Los_Angeles"
+    calendarId: providerConfig.config.calendarId || process.env.GOOGLE_CALENDAR_ID,
+    clientId: providerConfig.config.clientId || process.env.GOOGLE_CLIENT_ID,
+    clientSecret:
+      providerConfig.secrets.clientSecret ||
+      providerConfig.config.clientSecret ||
+      process.env.GOOGLE_CLIENT_SECRET,
+    refreshToken:
+      providerConfig.secrets.refreshToken ||
+      providerConfig.config.refreshToken ||
+      process.env.GOOGLE_REFRESH_TOKEN,
+    timeZone:
+      providerConfig.config.timeZone || process.env.GOOGLE_CALENDAR_TIMEZONE || "America/Los_Angeles"
   };
 }
 
-function assertGoogleCalendarConfig(): GoogleCalendarResolvedConfig {
-  const config = getGoogleCalendarConfig();
+function assertGoogleCalendarConfig(providerConfig: ResolvedBusinessProviderConfig): GoogleCalendarResolvedConfig {
+  const config = getGoogleCalendarConfig(providerConfig);
 
   if (!config.calendarId || !config.clientId || !config.clientSecret || !config.refreshToken) {
     throw new Error(
@@ -66,8 +74,8 @@ function assertGoogleCalendarConfig(): GoogleCalendarResolvedConfig {
   };
 }
 
-async function getAccessToken() {
-  const config = assertGoogleCalendarConfig();
+async function getAccessToken(providerConfig: ResolvedBusinessProviderConfig) {
+  const config = assertGoogleCalendarConfig(providerConfig);
   const body = new URLSearchParams({
     client_id: config.clientId,
     client_secret: config.clientSecret,
@@ -92,9 +100,12 @@ async function getAccessToken() {
   return payload.access_token;
 }
 
-function buildEventPayload(input: CalendarCreateEventInput | CalendarUpdateEventInput) {
+function buildEventPayload(
+  input: CalendarCreateEventInput | CalendarUpdateEventInput,
+  providerConfig: ResolvedBusinessProviderConfig
+) {
   const { appointment } = input;
-  const { timeZone } = assertGoogleCalendarConfig();
+  const { timeZone } = assertGoogleCalendarConfig(providerConfig);
   const start = new Date(appointment.scheduledFor);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
 
@@ -126,16 +137,17 @@ function buildEventPayload(input: CalendarCreateEventInput | CalendarUpdateEvent
 async function createOrUpdateEvent(
   method: "POST" | "PUT",
   path: string,
-  input: CalendarCreateEventInput | CalendarUpdateEventInput
+  input: CalendarCreateEventInput | CalendarUpdateEventInput,
+  providerConfig: ResolvedBusinessProviderConfig
 ) {
-  const accessToken = await getAccessToken();
+  const accessToken = await getAccessToken(providerConfig);
   const response = await fetch(`${GOOGLE_CALENDAR_API_BASE}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(buildEventPayload(input))
+    body: JSON.stringify(buildEventPayload(input, providerConfig))
   });
   const payload = (await response.json()) as GoogleCalendarEventResponse;
 
@@ -154,27 +166,29 @@ async function createOrUpdateEvent(
 
 export const googleCalendarProvider: CalendarProvider = {
   name: "google",
-  async createEvent(input: CalendarCreateEventInput) {
-    const { calendarId } = assertGoogleCalendarConfig();
+  async createEvent(input: CalendarCreateEventInput, providerConfig: ResolvedBusinessProviderConfig) {
+    const { calendarId } = assertGoogleCalendarConfig(providerConfig);
 
     return createOrUpdateEvent(
       "POST",
       `/calendars/${encodeURIComponent(calendarId)}/events`,
-      input
+      input,
+      providerConfig
     );
   },
-  async updateEvent(input: CalendarUpdateEventInput) {
-    const { calendarId } = assertGoogleCalendarConfig();
+  async updateEvent(input: CalendarUpdateEventInput, providerConfig: ResolvedBusinessProviderConfig) {
+    const { calendarId } = assertGoogleCalendarConfig(providerConfig);
 
     return createOrUpdateEvent(
       "PUT",
       `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(input.externalEventId)}`,
-      input
+      input,
+      providerConfig
     );
   },
-  async deleteEvent(input: CalendarDeleteEventInput) {
-    const accessToken = await getAccessToken();
-    const { calendarId } = assertGoogleCalendarConfig();
+  async deleteEvent(input: CalendarDeleteEventInput, providerConfig: ResolvedBusinessProviderConfig) {
+    const accessToken = await getAccessToken(providerConfig);
+    const { calendarId } = assertGoogleCalendarConfig(providerConfig);
     const response = await fetch(
       `${GOOGLE_CALENDAR_API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(input.externalEventId)}`,
       {

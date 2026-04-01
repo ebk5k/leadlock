@@ -33,12 +33,12 @@ export function ProblemSection() {
         />
         <div className="grid gap-4 lg:grid-cols-3">
           {problems.map((problem) => (
-            <Card className="rounded-3xl border-slate-200 p-6" key={problem.title}>
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
+            <Card className="rounded-3xl p-6" key={problem.title}>
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-400/20 bg-rose-400/10 text-rose-300">
                 <problem.icon className="h-5 w-5" />
               </div>
-              <h3 className="mt-5 text-lg font-semibold text-slate-950">{problem.title}</h3>
-              <p className="mt-2 text-sm leading-7 text-muted-foreground">{problem.description}</p>
+              <h3 className="mt-5 text-lg font-semibold text-white">{problem.title}</h3>
+              <p className="mt-2 text-sm leading-7 text-slate-300">{problem.description}</p>
             </Card>
           ))}
         </div>
