@@ -55,7 +55,7 @@ function mapRetellOutcome(
 export function normalizeRetellWebhookPayload(
   payload: Record<string, unknown>
 ): NormalizedCallWebhookEvent {
-  const p = payload as RetellCallPayload;
+  const p = payload as unknown as RetellCallPayload;
   const call = p.call ?? {};
   const analysis = call.call_analysis ?? {};
 

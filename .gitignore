@@ -4,5 +4,5 @@ coverage
 dist
 .DS_Store
 *.log
-data
+/data
 .env.local
